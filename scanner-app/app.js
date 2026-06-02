@@ -95,19 +95,36 @@ function startScanner() {
     readerDiv.classList.remove('hidden');
     resultCard.classList.add('hidden');
     
-    if (html5QrcodeScanner) return;
+    if (!html5QrcodeScanner) {
+        // Use the barebones Html5Qrcode instead of Html5QrcodeScanner to avoid ugly injected UI
+        html5QrcodeScanner = new Html5Qrcode("reader");
+    }
 
-    html5QrcodeScanner = new Html5QrcodeScanner(
-        "reader", { fps: 10, qrbox: {width: 250, height: 250}, aspectRatio: 1.0 }
-    );
-    html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+    // Check if it's already scanning
+    if (html5QrcodeScanner.isScanning) return;
+
+    html5QrcodeScanner.start(
+        { facingMode: "environment" }, // Prefer back camera
+        { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
+        onScanSuccess,
+        onScanFailure
+    ).catch(err => {
+        console.error("Camera start failed: ", err);
+        // Fallback for laptops with no back camera
+        html5QrcodeScanner.start(
+            cameraIdOrConfig = 0, 
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+            onScanSuccess,
+            onScanFailure
+        ).catch(e => console.error(e));
+    });
 }
 
 function stopScanner() {
-    if (html5QrcodeScanner) {
-        html5QrcodeScanner.clear().then(() => {
-            html5QrcodeScanner = null;
-        });
+    if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
+        html5QrcodeScanner.stop().then(() => {
+            html5QrcodeScanner.clear();
+        }).catch(err => console.error(err));
     }
 }
 
