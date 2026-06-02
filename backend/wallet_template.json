@@ -22,7 +22,10 @@
         "latitude": 48.8566,
         "longitude": 2.3522
       }
-    ]
+    ],
+    "callbackOptions": {
+      "url": "https://projet-fidel.onrender.com/callbacks/google-wallet"
+    }
   },
   "loyaltyObject": {
     "id": "3388000000023151997.OBJECT_ID",

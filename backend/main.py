@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
@@ -190,3 +190,37 @@ def update_merchant_offer(req: UpdateOfferRequest):
         "reward_description": req.reward_description
     }).eq("id", req.merchant_id).execute()
     return {"status": "success"}
+
+@app.post("/callbacks/google-wallet")
+async def google_wallet_webhook(request: Request):
+    """Receives callback from Google Wallet when a pass is added or deleted."""
+    try:
+        content_type = request.headers.get("content-type", "")
+        if "application/json" in content_type:
+            body = await request.json()
+            token = body.get("signedMessage")
+        else:
+            token = (await request.body()).decode("utf-8")
+
+        if not token:
+            print("Webhook: No token found")
+            return {"status": "ok"}
+            
+        import jwt
+        payload = jwt.decode(token, options={"verify_signature": False})
+        
+        event_type = payload.get("eventType")
+        object_id = payload.get("objectObjectId") # e.g. "ISSUER_ID.customer_uuid"
+        
+        if event_type == "del" and object_id:
+            parts = object_id.split(".")
+            if len(parts) >= 2:
+                customer_id = parts[-1]
+                if supabase:
+                    print(f"Deleting customer {customer_id} (Card removed from Wallet)")
+                    supabase.table("customers").delete().eq("id", customer_id).execute()
+                    
+    except Exception as e:
+        print(f"Webhook error: {e}")
+        
+    return {"status": "ok"}
