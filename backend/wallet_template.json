@@ -1,0 +1,50 @@
+{
+  "issuerId": "3388000000023151997",
+  "classId": "3388000000023151997.loyalty_class_1",
+  "loyaltyClass": {
+    "id": "3388000000023151997.loyalty_class_1",
+    "issuerName": "La Mie Câline",
+    "programName": "Fidélité Gourmande",
+    "programLogo": {
+      "sourceUri": {
+        "uri": "https://images.unsplash.com/photo-1558961363-fa8fdf82db35?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60"
+      }
+    },
+    "heroImage": {
+      "sourceUri": {
+        "uri": "https://images.unsplash.com/photo-1550966871-3ed3cdb5ed0c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80"
+      }
+    },
+    "reviewStatus": "UNDER_REVIEW",
+    "hexBackgroundColor": "#FF9800",
+    "locations": [
+      {
+        "latitude": 48.8566,
+        "longitude": 2.3522
+      }
+    ]
+  },
+  "loyaltyObject": {
+    "id": "3388000000023151997.OBJECT_ID",
+    "classId": "3388000000023151997.loyalty_class_1",
+    "state": "ACTIVE",
+    "barcode": {
+      "type": "QR_CODE",
+      "value": "CUSTOMER_ID_HERE"
+    },
+    "loyaltyPoints": {
+      "label": "Points",
+      "balance": {
+        "int": 0
+      }
+    },
+    "textModulesData": [
+      {
+        "id": "points_info",
+        "header": "Prochain cadeau",
+        "body": "Plus que 10 points avant votre surprise !"
+      }
+    ],
+    "messages": []
+  }
+}

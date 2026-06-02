@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Votre Carte de Fidélité</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #FF7B00;
+            --bg-color: #0F0F13;
+            --surface: rgba(255, 255, 255, 0.05);
+            --text-main: #FFFFFF;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0; padding: 20px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 100vh;
+        }
+        .container {
+            width: 100%; max-width: 400px;
+            background: var(--surface);
+            padding: 30px 20px; border-radius: 24px;
+            text-align: center;
+        }
+        h1 { margin-top: 0; font-size: 24px; }
+        .input-group { margin-bottom: 16px; text-align: left; }
+        label { display: block; font-size: 14px; margin-bottom: 6px; color: #A0A0A5; }
+        input {
+            width: 100%; padding: 14px; border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(0,0,0,0.3); color: white;
+            box-sizing: border-box; font-size: 16px;
+        }
+        button {
+            width: 100%; padding: 16px;
+            background: linear-gradient(135deg, var(--primary), #E66A00);
+            color: white; border: none; border-radius: 12px;
+            font-size: 16px; font-weight: bold; cursor: pointer;
+            margin-top: 10px;
+        }
+        .gpay-btn {
+            background: black; color: white;
+            border: 1px solid #333; display: flex; align-items: center; justify-content: center; gap: 10px;
+        }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Créez votre carte</h1>
+        <p style="color: #A0A0A5; font-size: 14px; margin-bottom: 24px;">Remplissez vos informations pour obtenir votre carte de fidélité digitale.</p>
+        
+        <form id="signup-form">
+            <div class="input-group">
+                <label>Prénom</label>
+                <input type="text" id="first-name" required placeholder="Jean">
+            </div>
+            <div class="input-group">
+                <label>Nom</label>
+                <input type="text" id="last-name" required placeholder="Dupont">
+            </div>
+            <button type="submit" id="submit-btn">Générer ma carte</button>
+        </form>
+
+        <div id="success-area" class="hidden" style="margin-top: 20px;">
+            <a id="wallet-link" href="#" target="_blank" style="text-decoration: none;">
+                <button class="gpay-btn">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Google_Wallet_logo_%282022%29.svg/512px-Google_Wallet_logo_%282022%29.svg.png" width="24" alt="Wallet">
+                    Ajouter à Google Wallet
+                </button>
+            </a>
+            <p style="font-size: 12px; color: #A0A0A5; margin-top: 15px;">Cliquez sur le bouton ci-dessus pour enregistrer votre carte.</p>
+        </div>
+    </div>
+
+    <script src="signup.js"></script>
+</body>
+</html>

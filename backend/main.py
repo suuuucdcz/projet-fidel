@@ -1,0 +1,192 @@
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Optional
+from db import supabase
+from wallet_service import wallet_service
+
+app = FastAPI(title="Loyalty Cards Agency Platform API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+class GenerateCardRequest(BaseModel):
+    first_name: str
+    last_name: str
+
+class ScanRequest(BaseModel):
+    customer_id: str
+    merchant_id: str
+
+class PushMessageRequest(BaseModel):
+    merchant_id: str
+    header: str
+    body: str
+
+class UpdateOfferRequest(BaseModel):
+    merchant_id: str
+    reward_threshold: int
+    reward_description: str
+
+@app.get("/")
+def read_root():
+    return {"message": "Agency Platform API is running"}
+
+@app.post("/merchants/login")
+def login(req: LoginRequest):
+    if not supabase:
+        if req.email == "test@lamiecaline.com":
+            return {"merchant_id": "dummy-merchant-id"}
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    response = supabase.table("merchants").select("*").eq("email", req.email).execute()
+    if not response.data:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    merchant = response.data[0]
+    return {"merchant_id": merchant["id"]}
+
+@app.post("/cards/generate/{merchant_id}")
+def generate_card(merchant_id: str, req: GenerateCardRequest):
+    """
+    Called by the web registration form.
+    """
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    # Fetch merchant info to get reward rules
+    m_res = supabase.table("merchants").select("*").eq("id", merchant_id).execute()
+    if not m_res.data:
+        raise HTTPException(status_code=404, detail="Merchant not found")
+    merchant = m_res.data[0]
+
+    # Create new customer
+    customer_res = supabase.table("customers").insert({
+        "first_name": req.first_name,
+        "last_name": req.last_name
+    }).execute()
+    customer_id = customer_res.data[0]["id"]
+    
+    # Link customer to merchant
+    supabase.table("loyalty_cards").insert({
+        "merchant_id": merchant_id,
+        "customer_id": customer_id,
+        "points": 0
+    }).execute()
+    
+    # Generate Wallet Link with merchant rules
+    link = wallet_service.generate_jwt_url(
+        customer_id=customer_id, 
+        points=0, 
+        merchant_name=merchant["name"],
+        threshold=merchant["reward_threshold"],
+        reward_desc=merchant["reward_description"],
+        first_name=req.first_name
+    )
+    
+    return {"wallet_link": link, "customer_id": customer_id}
+
+@app.post("/cards/scan")
+def scan_card(req: ScanRequest):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    # Fetch current points
+    card_res = supabase.table("loyalty_cards").select("points").eq("merchant_id", req.merchant_id).eq("customer_id", req.customer_id).execute()
+    if not card_res.data:
+        raise HTTPException(status_code=404, detail="Loyalty card not found")
+        
+    current_points = card_res.data[0]["points"]
+    
+    # Fetch merchant rules
+    m_res = supabase.table("merchants").select("*").eq("id", req.merchant_id).execute()
+    merchant = m_res.data[0]
+    threshold = merchant["reward_threshold"]
+    reward_desc = merchant["reward_description"]
+
+    new_points = current_points + 1
+    reward_triggered = False
+
+    if new_points >= threshold:
+        # Threshold reached! Reward the user and reset points.
+        reward_triggered = True
+        new_points = 0 # Reset cycle
+
+    # Update DB
+    supabase.table("loyalty_cards").update({"points": new_points}).eq("merchant_id", req.merchant_id).eq("customer_id", req.customer_id).execute()
+    
+    # Push update to Google Wallet
+    try:
+        if reward_triggered:
+            # Send a special notification for the reward
+            wallet_service.update_points(req.customer_id, new_points, threshold, reward_desc, reward_unlocked=True)
+        else:
+            wallet_service.update_points(req.customer_id, new_points, threshold, reward_desc, reward_unlocked=False)
+    except Exception as e:
+        print(f"Warning: Failed to push update to wallet: {e}")
+        
+    return {"status": "success", "new_points": new_points, "reward_triggered": reward_triggered, "reward_desc": reward_desc if reward_triggered else None}
+
+@app.post("/marketing/push")
+def push_marketing(req: PushMessageRequest):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+        
+    cards_res = supabase.table("loyalty_cards").select("customer_id").eq("merchant_id", req.merchant_id).execute()
+    customers = cards_res.data
+    
+    sent = 0
+    for card in customers:
+        try:
+            wallet_service.push_marketing_message(card["customer_id"], req.header, req.body)
+            sent += 1
+        except Exception as e:
+            print(f"Failed to send to {card['customer_id']}: {e}")
+            
+    return {"status": "success", "sent": sent, "total": len(customers)}
+
+# ==========================================
+# SUPER-ADMIN / DASHBOARD ROUTES
+# ==========================================
+
+@app.get("/dashboard/stats/{merchant_id}")
+def get_dashboard_stats(merchant_id: str):
+    if not supabase: return {"total_customers": 0, "total_points": 0}
+    res = supabase.table("loyalty_cards").select("points").eq("merchant_id", merchant_id).execute()
+    cards = res.data
+    return {
+        "total_customers": len(cards), 
+        "total_points": sum(card["points"] for card in cards)
+    }
+
+@app.get("/dashboard/customers/{merchant_id}")
+def get_dashboard_customers(merchant_id: str):
+    if not supabase: return []
+    res = supabase.table("loyalty_cards").select("customer_id, points, created_at, customers(first_name, last_name)").eq("merchant_id", merchant_id).order("created_at", desc=True).execute()
+    return res.data
+
+@app.get("/dashboard/admin/merchants")
+def get_all_merchants():
+    """Fetches all merchants for the Super-Admin Agency dashboard"""
+    if not supabase: return []
+    res = supabase.table("merchants").select("*").order("created_at", desc=True).execute()
+    return res.data
+
+@app.post("/dashboard/admin/update_offer")
+def update_merchant_offer(req: UpdateOfferRequest):
+    """Update reward threshold and description for a merchant"""
+    if not supabase: raise HTTPException(status_code=500)
+    supabase.table("merchants").update({
+        "reward_threshold": req.reward_threshold,
+        "reward_description": req.reward_description
+    }).eq("id", req.merchant_id).execute()
+    return {"status": "success"}

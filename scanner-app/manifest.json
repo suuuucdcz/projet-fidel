@@ -1,0 +1,21 @@
+{
+    "name": "Scanner Fidélité",
+    "short_name": "Scanner",
+    "description": "Scanner de comptoir pour cartes de fidélité digitales",
+    "start_url": "./index.html",
+    "display": "standalone",
+    "background_color": "#0F0F13",
+    "theme_color": "#FF7B00",
+    "icons": [
+        {
+            "src": "https://via.placeholder.com/192x192.png?text=LMC",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "https://via.placeholder.com/512x512.png?text=LMC",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Agence Dashboard</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#FF9800">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .dashboard-container { padding-bottom: 20px; max-width: 900px; margin: 0 auto; }
+        .nav-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        
+        .merchant-card { background: rgba(0,0,0,0.3); border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid var(--surface-border); }
+        .merchant-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .merchant-title { font-size: 20px; font-weight: bold; color: var(--primary); }
+        
+        .offer-form { display: flex; gap: 10px; margin-bottom: 20px; background: rgba(255,255,255,0.02); padding: 15px; border-radius: 8px; }
+        .offer-form input { flex: 1; font-size: 14px; padding: 10px; }
+        .offer-form button { width: auto; padding: 10px 20px; font-size: 14px; }
+        
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th, td { padding: 12px; border-bottom: 1px solid var(--surface-border); font-size: 14px; }
+        th { background: rgba(0,0,0,0.4); color: var(--text-muted); font-size: 12px; text-transform: uppercase; }
+        
+        .badge { background: var(--accent); color: white; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: bold;}
+    </style>
+</head>
+<body>
+    <div class="app-container dashboard-container">
+        <div class="nav-header">
+            <div class="logo-area">
+                <h1>Fidélité<span>Agency</span></h1>
+            </div>
+            <a href="index.html" class="btn-secondary" style="text-decoration: none; padding: 10px 16px; border-radius: 8px; width: auto;">Retour Scanner</a>
+        </div>
+
+        <div class="glass-panel">
+            <h2 style="margin-bottom: 5px;">Tous vos Commerçants</h2>
+            <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 20px;">Gérez les offres de fidélité et consultez les clients de vos partenaires.</p>
+            
+            <div id="merchants-list">
+                <!-- Injected via JS -->
+                <div style="text-align: center; padding: 40px; color: gray;">Chargement...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="dashboard.js"></script>
+</body>
+</html>

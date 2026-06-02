@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+backend/venv/
+
+# Environment variables
+.env
+
+# Secrets & Keys
+service_account.json
+*.json
+!backend/wallet_template.json
+!scanner-app/manifest.json
+!dashboard-app/manifest.json
+
+# Android Studio / Gradle
+scanner-android-app/app/build/
+scanner-android-app/.gradle/
+scanner-android-app/local.properties
+scanner-android-app/.idea/
+
+# Mac
+.DS_Store
