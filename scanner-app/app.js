@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://192.168.1.59:8000'; // IP pour le test via APK/Téléphone
+const API_BASE_URL = 'https://projet-fidel.onrender.com';
 let currentMerchantId = localStorage.getItem('merchant_id');
 let html5QrcodeScanner = null;
 
