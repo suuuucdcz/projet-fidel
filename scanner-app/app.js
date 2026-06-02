@@ -28,7 +28,7 @@ document.getElementById('nav-scanner').addEventListener('click', () => {
     scannerSection.classList.remove('hidden');
     pushSection.classList.add('hidden');
     settingsSection.classList.add('hidden');
-    if (!html5QrCode) startScanner();
+    startScanner();
 });
 
 document.getElementById('nav-push').addEventListener('click', () => {
