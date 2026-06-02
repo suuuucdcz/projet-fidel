@@ -24,16 +24,20 @@ document.addEventListener('DOMContentLoaded', () => {
 document.getElementById('nav-scanner').addEventListener('click', () => {
     document.getElementById('nav-scanner').classList.add('active');
     document.getElementById('nav-push').classList.remove('active');
+    document.getElementById('nav-settings').classList.remove('active');
     scannerSection.classList.remove('hidden');
     pushSection.classList.add('hidden');
+    settingsSection.classList.add('hidden');
     if (!html5QrcodeScanner) startScanner();
 });
 
 document.getElementById('nav-push').addEventListener('click', () => {
     document.getElementById('nav-push').classList.add('active');
     document.getElementById('nav-scanner').classList.remove('active');
+    document.getElementById('nav-settings').classList.remove('active');
     pushSection.classList.remove('hidden');
     scannerSection.classList.add('hidden');
+    settingsSection.classList.add('hidden');
     stopScanner();
 });
 
@@ -87,6 +91,8 @@ document.getElementById('logout-btn').addEventListener('click', () => {
 function showScanner() {
     loginSection.classList.add('hidden');
     scannerSection.classList.remove('hidden');
+    pushSection.classList.add('hidden');
+    settingsSection.classList.add('hidden');
     bottomNav.classList.remove('hidden');
     startScanner();
 }
