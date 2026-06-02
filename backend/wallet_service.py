@@ -9,7 +9,7 @@ import jwt
 
 class GoogleWalletService:
     def __init__(self):
-        self.issuer_id = os.environ.get("GOOGLE_ISSUER_ID", "YOUR_ISSUER_ID")
+        self.issuer_id = os.environ.get("GOOGLE_ISSUER_ID", "3388000000023151997")
         self.credentials_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "service_account.json")
         self.base_url = "https://walletobjects.googleapis.com/walletobjects/v1"
         self.scopes = ["https://www.googleapis.com/auth/wallet_object.issuer"]
