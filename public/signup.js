@@ -48,7 +48,12 @@ document.getElementById('signup-form').addEventListener('submit', async (e) => {
         const response = await fetch(`${API_BASE_URL}/cards/generate/${merchantId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ first_name: firstName, last_name: lastName, pin_code: pinCode })
+            body: JSON.stringify({ 
+                first_name: firstName, 
+                last_name: lastName, 
+                pin_code: pinCode,
+                action: mode 
+            })
         });
 
         if (!response.ok) {

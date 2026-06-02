@@ -23,6 +23,7 @@ class GenerateCardRequest(BaseModel):
     first_name: str
     last_name: str
     pin_code: str
+    action: str = "signup"  # "signup" or "login"
 
 class ScanRequest(BaseModel):
     customer_id: str
@@ -77,6 +78,9 @@ def generate_card(merchant_id: str, req: GenerateCardRequest):
     points = 0
     
     if existing_customers.data:
+        if req.action == "signup":
+            raise HTTPException(status_code=409, detail="Ce compte existe déjà ! Veuillez utiliser l'onglet 'J'ai déjà une carte' pour vous reconnecter.")
+            
         # User found with this name. Verify PIN.
         matched_cust = None
         for cust in existing_customers.data:
@@ -86,7 +90,7 @@ def generate_card(merchant_id: str, req: GenerateCardRequest):
                 
         if not matched_cust:
             # Wrong PIN
-            raise HTTPException(status_code=401, detail="Code PIN incorrect pour ce nom. Si vous êtes une autre personne, veuillez ajouter l'initiale de votre 2ème prénom.")
+            raise HTTPException(status_code=401, detail="Code PIN incorrect pour ce nom.")
             
         cid = matched_cust["id"]
         # Check if they already have a card for THIS merchant
@@ -105,6 +109,9 @@ def generate_card(merchant_id: str, req: GenerateCardRequest):
             points = 0
                 
     if not customer_id:
+        if req.action == "login":
+            raise HTTPException(status_code=404, detail="Aucun compte trouvé à ce nom. Veuillez créer une nouvelle carte.")
+            
         # Create NEW customer profile
         customer_res = supabase.table("customers").insert({
             "first_name": req.first_name,
