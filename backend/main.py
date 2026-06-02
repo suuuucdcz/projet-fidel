@@ -205,7 +205,9 @@ def push_marketing(req: PushMessageRequest):
             sent += 1
         except Exception as e:
             print(f"Failed to send to {card['customer_id']}: {e}")
-            
+    if sent == 0 and len(customers) > 0:
+        raise HTTPException(status_code=500, detail="Echec de l'envoi Google Wallet")
+        
     return {"status": "success", "sent": sent, "total": len(customers)}
 
 # ==========================================

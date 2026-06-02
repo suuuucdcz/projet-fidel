@@ -162,6 +162,7 @@ class GoogleWalletService:
         response = requests.post(url, headers=headers, json=message_body)
         if response.status_code != 200:
             print(f"Failed to send marketing message: {response.text}")
-        return response.json() if response.status_code == 200 else None
+            raise Exception(f"Google Wallet API Error: {response.status_code}")
+        return response.json()
 
 wallet_service = GoogleWalletService()
