@@ -30,7 +30,7 @@ async function fetchAgencyData() {
             // Build customers table rows
             let rows = '';
             if (customers.length === 0) {
-                rows = '<tr><td colspan="3" style="text-align:center; color:gray;">Aucun client</td></tr>';
+                rows = '<tr><td colspan="4" style="text-align:center; color:gray;">Aucun client</td></tr>';
             } else {
                 customers.forEach(c => {
                     const name = c.customers ? `${c.customers.first_name || ''} ${c.customers.last_name || ''}` : 'Inconnu';
@@ -39,6 +39,7 @@ async function fetchAgencyData() {
                             <td><strong>${name}</strong></td>
                             <td><span class="badge">${c.points} pts</span></td>
                             <td style="color:gray; font-size:12px;">${new Date(c.created_at).toLocaleDateString()}</td>
+                            <td><button onclick="deleteCustomer('${m.id}', '${c.customer_id}')" style="background:none; color:red; border:none; cursor:pointer; font-size:12px; font-weight:bold;">Retirer</button></td>
                         </tr>
                     `;
                 });
@@ -68,8 +69,11 @@ async function fetchAgencyData() {
 
             card.innerHTML = `
                 <div class="merchant-header">
-                    <div class="merchant-title">${m.name}</div>
-                    <div style="color:gray; font-size:14px;">${customers.length} clients</div>
+                    <div>
+                        <div class="merchant-title">${m.name}</div>
+                        <div style="color:gray; font-size:14px;">${customers.length} clients</div>
+                    </div>
+                    <button onclick="deleteMerchant('${m.id}')" style="background:red; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:bold;">Supprimer la boutique</button>
                 </div>
                 
                 <form class="offer-form" onsubmit="updateOffer(event, '${m.id}')">
@@ -91,7 +95,7 @@ async function fetchAgencyData() {
                         <div style="padding: 10px; background: rgba(0,0,0,0.3); font-weight: bold; font-size: 14px;">Clients (${customers.length})</div>
                         <table>
                             <thead>
-                                <tr><th>Client</th><th>Points</th><th>Inscrit le</th></tr>
+                                <tr><th>Client</th><th>Points</th><th>Inscrit le</th><th>Action</th></tr>
                             </thead>
                             <tbody>${rows}</tbody>
                         </table>
@@ -188,3 +192,33 @@ document.getElementById('create-merchant-form').addEventListener('submit', async
         btn.innerText = "Créer le compte";
     }
 });
+
+// Handle Customer Deletion
+window.deleteCustomer = async function(merchantId, customerId) {
+    if (!confirm("Voulez-vous vraiment retirer cette carte de fidélité pour ce client ?")) return;
+    
+    try {
+        const res = await fetch(`${API_BASE_URL}/dashboard/admin/customers/${merchantId}/${customerId}`, {
+            method: 'DELETE'
+        });
+        if (!res.ok) throw new Error("Erreur lors de la suppression du client");
+        fetchAgencyData(); // Refresh UI
+    } catch (err) {
+        alert(err.message);
+    }
+}
+
+// Handle Merchant Deletion
+window.deleteMerchant = async function(merchantId) {
+    if (!confirm("ATTENTION : Êtes-vous sûr de vouloir supprimer définitivement cette boutique, tous ses historiques, et TOUTES les cartes de fidélité de ses clients ?")) return;
+    
+    try {
+        const res = await fetch(`${API_BASE_URL}/dashboard/admin/merchants/${merchantId}`, {
+            method: 'DELETE'
+        });
+        if (!res.ok) throw new Error("Erreur lors de la suppression de la boutique");
+        fetchAgencyData(); // Refresh UI
+    } catch (err) {
+        alert(err.message);
+    }
+}

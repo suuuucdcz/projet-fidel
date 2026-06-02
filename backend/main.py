@@ -304,3 +304,17 @@ def get_merchant_logs(merchant_id: str):
     res = supabase.table("scan_logs").select("action_type, created_at, points_added, customers(first_name, last_name)").eq("merchant_id", merchant_id).order("created_at", desc=True).limit(50).execute()
     return res.data
 
+@app.delete("/dashboard/admin/merchants/{merchant_id}")
+def delete_merchant(merchant_id: str):
+    if not supabase: raise HTTPException(status_code=500)
+    supabase.table("merchants").delete().eq("id", merchant_id).execute()
+    return {"status": "success"}
+
+@app.delete("/dashboard/admin/customers/{merchant_id}/{customer_id}")
+def delete_customer_from_merchant(merchant_id: str, customer_id: str):
+    if not supabase: raise HTTPException(status_code=500)
+    # Remove the loyalty card linking the customer to this merchant
+    supabase.table("loyalty_cards").delete().eq("merchant_id", merchant_id).eq("customer_id", customer_id).execute()
+    # Optional: We could check if they have other loyalty cards and if not delete from customers, but keeping them in customers is safer.
+    return {"status": "success"}
+
