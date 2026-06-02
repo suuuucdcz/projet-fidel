@@ -196,29 +196,39 @@ async def google_wallet_webhook(request: Request):
     """Receives callback from Google Wallet when a pass is added or deleted."""
     try:
         content_type = request.headers.get("content-type", "")
+        body_bytes = await request.body()
+        print(f"WEBHOOK RAW BODY: {body_bytes}")
+        
+        payload = {}
         if "application/json" in content_type:
-            body = await request.json()
-            token = body.get("signedMessage")
+            try:
+                import json
+                body = json.loads(body_bytes)
+                if "signedMessage" in body:
+                    import jwt
+                    payload = jwt.decode(body["signedMessage"], options={"verify_signature": False})
+                else:
+                    payload = body
+            except Exception:
+                pass
         else:
-            token = (await request.body()).decode("utf-8")
+            try:
+                import jwt
+                payload = jwt.decode(body_bytes.decode("utf-8"), options={"verify_signature": False})
+            except Exception:
+                pass
 
-        if not token:
-            print("Webhook: No token found")
-            return {"status": "ok"}
-            
-        import jwt
-        payload = jwt.decode(token, options={"verify_signature": False})
+        print(f"WEBHOOK PAYLOAD: {payload}")
         
-        event_type = payload.get("eventType")
-        object_id = payload.get("objectObjectId") # e.g. "ISSUER_ID.customer_uuid"
+        event_type = str(payload.get("eventType", "")).lower()
+        object_id = payload.get("objectObjectId") or payload.get("objectId") or ""
         
-        if event_type == "del" and object_id:
+        if ("del" in event_type or "remove" in event_type) and object_id:
             parts = object_id.split(".")
-            if len(parts) >= 2:
-                customer_id = parts[-1]
-                if supabase:
-                    print(f"Deleting customer {customer_id} (Card removed from Wallet)")
-                    supabase.table("customers").delete().eq("id", customer_id).execute()
+            customer_id = parts[-1]
+            if supabase:
+                print(f"Deleting customer {customer_id} (Card removed from Wallet)")
+                supabase.table("customers").delete().eq("id", customer_id).execute()
                     
     except Exception as e:
         print(f"Webhook error: {e}")
