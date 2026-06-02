@@ -57,6 +57,17 @@ def login(req: LoginRequest):
     merchant = response.data[0]
     return {"merchant_id": merchant["id"]}
 
+@app.get("/merchants/settings/{merchant_id}")
+def get_merchant_settings(merchant_id: str):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+        
+    m_res = supabase.table("merchants").select("reward_threshold, reward_description").eq("id", merchant_id).execute()
+    if not m_res.data:
+        raise HTTPException(status_code=404, detail="Merchant not found")
+        
+    return m_res.data[0]
+
 @app.post("/cards/generate/{merchant_id}")
 def generate_card(merchant_id: str, req: GenerateCardRequest):
     """

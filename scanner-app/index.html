@@ -82,10 +82,27 @@
                 <button type="submit" class="btn-accent">Envoyer à tous les clients</button>
             </form>
         </section>
+        <!-- Settings Section -->
+        <section id="settings-section" class="glass-panel hidden">
+            <h2>Paramètres Fidélité</h2>
+            <form id="settings-form">
+                <div class="input-group">
+                    <label for="settings-threshold">Points requis pour la récompense</label>
+                    <input type="number" id="settings-threshold" required min="1" max="100">
+                </div>
+                <div class="input-group">
+                    <label for="settings-reward">Description de la récompense</label>
+                    <textarea id="settings-reward" required></textarea>
+                </div>
+                <button type="submit" class="btn-primary" id="settings-submit-btn">Sauvegarder</button>
+                <div id="settings-msg" class="success-msg hidden" style="color: #4CAF50; margin-top: 10px; font-weight: bold; text-align: center;">Mise à jour réussie !</div>
+            </form>
+        </section>
         
         <nav id="bottom-nav" class="bottom-nav hidden">
             <button id="nav-scanner" class="nav-item active">Scanner</button>
-            <button id="nav-push" class="nav-item">Push Marketing</button>
+            <button id="nav-push" class="nav-item">Push</button>
+            <button id="nav-settings" class="nav-item">Paramètres</button>
         </nav>
     </div>
 

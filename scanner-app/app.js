@@ -178,6 +178,62 @@ document.getElementById('push-form').addEventListener('submit', async (e) => {
     }
 });
 
+// Settings Logic
+const settingsSection = document.getElementById('settings-section');
+document.getElementById('nav-settings').addEventListener('click', () => {
+    document.getElementById('nav-settings').classList.add('active');
+    document.getElementById('nav-scanner').classList.remove('active');
+    document.getElementById('nav-push').classList.remove('active');
+    
+    settingsSection.classList.remove('hidden');
+    scannerSection.classList.add('hidden');
+    pushSection.classList.add('hidden');
+    stopScanner();
+    loadSettings();
+});
+
+async function loadSettings() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/merchants/settings/${currentMerchantId}`);
+        if (!response.ok) throw new Error('Erreur de chargement');
+        const data = await response.json();
+        document.getElementById('settings-threshold').value = data.reward_threshold;
+        document.getElementById('settings-reward').value = data.reward_description;
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+document.getElementById('settings-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const threshold = parseInt(document.getElementById('settings-threshold').value);
+    const reward = document.getElementById('settings-reward').value;
+    const btn = document.getElementById('settings-submit-btn');
+    const msg = document.getElementById('settings-msg');
+    
+    btn.disabled = true;
+    btn.innerText = 'Sauvegarde...';
+    msg.classList.add('hidden');
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/dashboard/admin/update_offer`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ merchant_id: currentMerchantId, reward_threshold: threshold, reward_description: reward })
+        });
+
+        if (!response.ok) throw new Error('Erreur lors de la sauvegarde');
+        
+        msg.classList.remove('hidden');
+        setTimeout(() => msg.classList.add('hidden'), 3000);
+    } catch (error) {
+        alert(error.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerText = 'Sauvegarder';
+    }
+});
+
 // PWA Service Worker Registration (Dummy for MVP)
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
