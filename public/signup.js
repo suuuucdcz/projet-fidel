@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8000'; // Change in prod
+const API_BASE_URL = 'https://projet-fidel.onrender.com'; // Change in prod
 
 // Parse merchant_id from URL: signup.html?merchant_id=xxx
 const urlParams = new URLSearchParams(window.location.search);
