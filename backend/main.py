@@ -69,24 +69,41 @@ def generate_card(merchant_id: str, req: GenerateCardRequest):
         raise HTTPException(status_code=404, detail="Merchant not found")
     merchant = m_res.data[0]
 
-    # Create new customer
-    customer_res = supabase.table("customers").insert({
-        "first_name": req.first_name,
-        "last_name": req.last_name
-    }).execute()
-    customer_id = customer_res.data[0]["id"]
+    # Check if customer already exists for this merchant
+    existing_customers = supabase.table("customers").select("id").eq("first_name", req.first_name).eq("last_name", req.last_name).execute()
     
-    # Link customer to merchant
-    supabase.table("loyalty_cards").insert({
-        "merchant_id": merchant_id,
-        "customer_id": customer_id,
-        "points": 0
-    }).execute()
+    customer_id = None
+    points = 0
     
+    if existing_customers.data:
+        for cust in existing_customers.data:
+            cid = cust["id"]
+            card_check = supabase.table("loyalty_cards").select("*").eq("customer_id", cid).eq("merchant_id", merchant_id).execute()
+            if card_check.data:
+                customer_id = cid
+                points = card_check.data[0]["points"]
+                break
+                
+    if not customer_id:
+        # Create NEW customer
+        customer_res = supabase.table("customers").insert({
+            "first_name": req.first_name,
+            "last_name": req.last_name
+        }).execute()
+        customer_id = customer_res.data[0]["id"]
+        
+        # Link customer to merchant
+        supabase.table("loyalty_cards").insert({
+            "merchant_id": merchant_id,
+            "customer_id": customer_id,
+            "points": 0
+        }).execute()
+        points = 0
+
     # Generate Wallet Link with merchant rules
     link = wallet_service.generate_jwt_url(
         customer_id=customer_id, 
-        points=0, 
+        points=points, 
         merchant_name=merchant["name"],
         threshold=merchant["reward_threshold"],
         reward_desc=merchant["reward_description"],
