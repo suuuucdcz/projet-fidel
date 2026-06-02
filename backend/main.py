@@ -4,6 +4,9 @@ from pydantic import BaseModel
 from typing import Optional
 from db import supabase
 from wallet_service import wallet_service
+from passlib.context import CryptContext
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 app = FastAPI(title="Loyalty Cards Agency Platform API")
 
@@ -39,6 +42,11 @@ class UpdateOfferRequest(BaseModel):
     reward_threshold: int
     reward_description: str
 
+class CreateMerchantRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+
 @app.get("/")
 def read_root():
     return {"message": "Agency Platform API is running"}
@@ -53,6 +61,13 @@ def login(req: LoginRequest):
         raise HTTPException(status_code=401, detail="Identifiants incorrects")
     
     merchant = response.data[0]
+    
+    # Check password
+    if not pwd_context.verify(req.password, merchant["password_hash"]):
+        # Special fallback for the old test account which wasn't hashed
+        if req.password != merchant["password_hash"]:
+             raise HTTPException(status_code=401, detail="Identifiants incorrects")
+    
     return {"merchant_id": merchant["id"]}
 
 @app.get("/merchants/settings/{merchant_id}")
@@ -178,6 +193,14 @@ def scan_card(req: ScanRequest):
     # Update DB
     supabase.table("loyalty_cards").update({"points": new_points}).eq("merchant_id", req.merchant_id).eq("customer_id", req.customer_id).execute()
     
+    # Log the scan
+    supabase.table("scan_logs").insert({
+        "merchant_id": req.merchant_id,
+        "customer_id": req.customer_id,
+        "action_type": "REWARD" if reward_triggered else "SCAN",
+        "points_added": 1
+    }).execute()
+    
     # Push update to Google Wallet
     try:
         if reward_triggered:
@@ -203,6 +226,14 @@ def push_marketing(req: PushMessageRequest):
         try:
             wallet_service.push_marketing_message(card["customer_id"], req.header, req.body)
             sent += 1
+            
+            # Log the push
+            supabase.table("scan_logs").insert({
+                "merchant_id": req.merchant_id,
+                "customer_id": card["customer_id"],
+                "action_type": "PUSH_CAMPAIGN",
+                "points_added": 0
+            }).execute()
         except Exception as e:
             print(f"Failed to send to {card['customer_id']}: {e}")
     if sent == 0 and len(customers) > 0:
@@ -246,4 +277,30 @@ def update_merchant_offer(req: UpdateOfferRequest):
         "reward_description": req.reward_description
     }).eq("id", req.merchant_id).execute()
     return {"status": "success"}
+
+@app.post("/dashboard/admin/merchants/create")
+def create_merchant(req: CreateMerchantRequest):
+    """Create a new merchant account with hashed password"""
+    if not supabase: raise HTTPException(status_code=500)
+    
+    # Check if exists
+    existing = supabase.table("merchants").select("id").eq("email", req.email).execute()
+    if existing.data:
+        raise HTTPException(status_code=400, detail="Un commerçant avec cet email existe déjà")
+        
+    hashed_pwd = pwd_context.hash(req.password)
+    
+    res = supabase.table("merchants").insert({
+        "name": req.name,
+        "email": req.email,
+        "password_hash": hashed_pwd
+    }).execute()
+    
+    return {"status": "success", "merchant_id": res.data[0]["id"]}
+
+@app.get("/dashboard/admin/logs/{merchant_id}")
+def get_merchant_logs(merchant_id: str):
+    if not supabase: return []
+    res = supabase.table("scan_logs").select("action_type, created_at, points_added, customers(first_name, last_name)").eq("merchant_id", merchant_id).order("created_at", desc=True).limit(50).execute()
+    return res.data
 

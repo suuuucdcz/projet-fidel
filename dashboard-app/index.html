@@ -36,9 +36,21 @@
             </div>
         </div>
 
+        <div class="glass-panel" style="margin-bottom: 20px;">
+            <h2 style="margin-bottom: 10px;">Ajouter un Commerçant</h2>
+            <form id="create-merchant-form" class="offer-form" style="background: rgba(255,255,255,0.05);">
+                <input type="text" id="new_merchant_name" placeholder="Nom de la boutique (ex: Boulangerie Paul)" required>
+                <input type="email" id="new_merchant_email" placeholder="Email (Identifiant)" required>
+                <input type="password" id="new_merchant_password" placeholder="Mot de passe" required>
+                <button type="submit" class="btn-primary">Créer le compte</button>
+            </form>
+            <div id="create-msg" style="color: var(--success); font-size: 14px; margin-top: 10px; display: none;">Compte créé avec succès !</div>
+            <div id="create-error" style="color: red; font-size: 14px; margin-top: 10px; display: none;"></div>
+        </div>
+
         <div class="glass-panel">
             <h2 style="margin-bottom: 5px;">Tous vos Commerçants</h2>
-            <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 20px;">Gérez les offres de fidélité et consultez les clients de vos partenaires.</p>
+            <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 20px;">Gérez les offres de fidélité, consultez les clients et l'historique d'activité.</p>
             
             <div id="merchants-list">
                 <!-- Injected via JS -->

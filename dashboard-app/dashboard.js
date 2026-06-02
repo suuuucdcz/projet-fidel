@@ -20,6 +20,10 @@ async function fetchAgencyData() {
             const custRes = await fetch(`${API_BASE_URL}/dashboard/customers/${m.id}`);
             const customers = await custRes.json();
             
+            // Fetch logs for this merchant
+            const logsRes = await fetch(`${API_BASE_URL}/dashboard/admin/logs/${m.id}`);
+            const logs = await logsRes.json();
+            
             const card = document.createElement('div');
             card.className = 'merchant-card';
             
@@ -35,6 +39,28 @@ async function fetchAgencyData() {
                             <td><strong>${name}</strong></td>
                             <td><span class="badge">${c.points} pts</span></td>
                             <td style="color:gray; font-size:12px;">${new Date(c.created_at).toLocaleDateString()}</td>
+                        </tr>
+                    `;
+                });
+            }
+
+            let logsRows = '';
+            if (logs.length === 0) {
+                logsRows = '<tr><td colspan="4" style="text-align:center; color:gray;">Aucun historique</td></tr>';
+            } else {
+                logs.forEach(l => {
+                    const clientName = l.customers ? `${l.customers.first_name || ''} ${l.customers.last_name || ''}` : 'Inconnu';
+                    let actionText = '';
+                    let actionColor = 'gray';
+                    if (l.action_type === 'SCAN') { actionText = '+1 Point'; actionColor = 'var(--primary)'; }
+                    if (l.action_type === 'REWARD') { actionText = 'Récompense !'; actionColor = 'var(--success)'; }
+                    if (l.action_type === 'PUSH_CAMPAIGN') { actionText = 'Push Marketing'; actionColor = 'var(--accent)'; }
+                    
+                    logsRows += `
+                        <tr>
+                            <td>${new Date(l.created_at).toLocaleString()}</td>
+                            <td><span style="color: ${actionColor}; font-weight: bold;">${actionText}</span></td>
+                            <td>${clientName}</td>
                         </tr>
                     `;
                 });
@@ -60,13 +86,26 @@ async function fetchAgencyData() {
                     </div>
                 </form>
 
-                <div style="margin-top: 15px; background: rgba(0,0,0,0.2); border-radius: 8px; overflow:hidden;">
-                    <table>
-                        <thead>
-                            <tr><th>Client</th><th>Points Actuels</th><th>Inscrit le</th></tr>
-                        </thead>
-                        <tbody>${rows}</tbody>
-                    </table>
+                <div style="display:flex; gap: 20px; margin-top: 15px;">
+                    <div style="flex: 1; background: rgba(0,0,0,0.2); border-radius: 8px; overflow:hidden;">
+                        <div style="padding: 10px; background: rgba(0,0,0,0.3); font-weight: bold; font-size: 14px;">Clients (${customers.length})</div>
+                        <table>
+                            <thead>
+                                <tr><th>Client</th><th>Points</th><th>Inscrit le</th></tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                    
+                    <div style="flex: 1; background: rgba(0,0,0,0.2); border-radius: 8px; overflow:hidden; max-height: 300px; overflow-y: auto;">
+                        <div style="padding: 10px; background: rgba(0,0,0,0.3); font-weight: bold; font-size: 14px;">Historique Récent</div>
+                        <table>
+                            <thead>
+                                <tr><th>Date</th><th>Action</th><th>Client</th></tr>
+                            </thead>
+                            <tbody>${logsRows}</tbody>
+                        </table>
+                    </div>
                 </div>
             `;
             container.appendChild(card);
@@ -106,3 +145,46 @@ window.updateOffer = async function(e, merchantId) {
         btn.innerText = "Sauvegarder l'offre";
     }
 }
+
+// Handle Merchant Creation
+document.getElementById('create-merchant-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = document.getElementById('new_merchant_name').value;
+    const email = document.getElementById('new_merchant_email').value;
+    const password = document.getElementById('new_merchant_password').value;
+    
+    const btn = e.target.querySelector('button');
+    const msg = document.getElementById('create-msg');
+    const errorMsg = document.getElementById('create-error');
+    
+    btn.disabled = true;
+    btn.innerText = "Création...";
+    msg.style.display = 'none';
+    errorMsg.style.display = 'none';
+    
+    try {
+        const res = await fetch(`${API_BASE_URL}/dashboard/admin/merchants/create`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ name, email, password })
+        });
+        
+        const data = await res.json();
+        
+        if (!res.ok) throw new Error(data.detail || "Erreur de création");
+        
+        msg.style.display = 'block';
+        e.target.reset();
+        
+        // Reload list
+        fetchAgencyData();
+        
+        setTimeout(() => { msg.style.display = 'none'; }, 3000);
+    } catch (err) {
+        errorMsg.innerText = err.message;
+        errorMsg.style.display = 'block';
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "Créer le compte";
+    }
+});

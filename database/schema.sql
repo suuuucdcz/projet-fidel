@@ -33,3 +33,13 @@ CREATE TABLE loyalty_cards (
 -- Insert a dummy merchant for testing
 INSERT INTO merchants (name, email, password_hash) 
 VALUES ('La Mie Câline - Test', 'test@lamiecaline.com', 'dummy_hash_for_now');
+
+-- 4. Scan Logs Table (Historique)
+CREATE TABLE scan_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    merchant_id UUID REFERENCES merchants(id) ON DELETE CASCADE,
+    customer_id UUID REFERENCES customers(id) ON DELETE CASCADE,
+    action_type VARCHAR(50), -- 'SCAN', 'REWARD', 'PUSH_CAMPAIGN'
+    points_added INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
