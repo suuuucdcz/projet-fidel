@@ -6,8 +6,7 @@ let merchantId = urlParams.get('merchant_id');
 
 // For local testing, fallback to the dummy merchant ID if missing
 if (!merchantId) {
-    merchantId = '9d3a9145-e190-4cae-b278-006bb54dd602'; // Change this to your real test ID
-    console.log("No merchant_id in URL, using fallback test ID:", merchantId);
+    merchantId = '9d3a9145-e190-4cae-b278-006bb54dd602';
 }
 
 let mode = 'signup';

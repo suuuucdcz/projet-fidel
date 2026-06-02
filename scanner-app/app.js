@@ -1,6 +1,6 @@
 const API_BASE_URL = 'https://projet-fidel.onrender.com';
 let currentMerchantId = localStorage.getItem('merchant_id');
-let html5QrcodeScanner = null;
+let html5QrCode = null;
 
 // DOM Elements
 const loginSection = document.getElementById('login-section');
@@ -28,7 +28,7 @@ document.getElementById('nav-scanner').addEventListener('click', () => {
     scannerSection.classList.remove('hidden');
     pushSection.classList.add('hidden');
     settingsSection.classList.add('hidden');
-    if (!html5QrcodeScanner) startScanner();
+    if (!html5QrCode) startScanner();
 });
 
 document.getElementById('nav-push').addEventListener('click', () => {
@@ -101,15 +101,13 @@ function startScanner() {
     readerDiv.classList.remove('hidden');
     resultCard.classList.add('hidden');
     
-    if (!html5QrcodeScanner) {
-        // Use the barebones Html5Qrcode instead of Html5QrcodeScanner to avoid ugly injected UI
-        html5QrcodeScanner = new Html5Qrcode("reader");
+    if (!html5QrCode) {
+        html5QrCode = new Html5Qrcode("reader");
     }
 
-    // Check if it's already scanning
-    if (html5QrcodeScanner.isScanning) return;
+    if (html5QrCode.isScanning) return;
 
-    html5QrcodeScanner.start(
+    html5QrCode.start(
         { facingMode: "environment" }, // Prefer back camera
         { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
         onScanSuccess,
@@ -117,19 +115,19 @@ function startScanner() {
     ).catch(err => {
         console.error("Camera start failed: ", err);
         // Fallback for laptops with no back camera
-        html5QrcodeScanner.start(
-            cameraIdOrConfig = 0, 
+        html5QrCode.start(
+            0, 
             { fps: 10, qrbox: { width: 250, height: 250 } },
             onScanSuccess,
-            onScanFailure
+            (e) => {} // ignore fallback scan errors
         ).catch(e => console.error(e));
     });
 }
 
 function stopScanner() {
-    if (html5QrcodeScanner && html5QrcodeScanner.isScanning) {
-        html5QrcodeScanner.stop().then(() => {
-            html5QrcodeScanner.clear();
+    if (html5QrCode && html5QrCode.isScanning) {
+        html5QrCode.stop().then(() => {
+            html5QrCode.clear();
         }).catch(err => console.error(err));
     }
 }
@@ -163,7 +161,7 @@ async function onScanSuccess(decodedText, decodedResult) {
 }
 
 function onScanFailure(error) {
-    // handle scan failure, usually better to ignore and keep scanning
+    // Ignore frame errors to avoid spamming console
 }
 
 document.getElementById('next-scan-btn').addEventListener('click', () => {

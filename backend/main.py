@@ -46,13 +46,11 @@ def read_root():
 @app.post("/merchants/login")
 def login(req: LoginRequest):
     if not supabase:
-        if req.email == "test@lamiecaline.com":
-            return {"merchant_id": "dummy-merchant-id"}
-        raise HTTPException(status_code=500, detail="Supabase not configured")
+        raise HTTPException(status_code=500, detail="Database connection is not configured")
 
     response = supabase.table("merchants").select("*").eq("email", req.email).execute()
     if not response.data:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        raise HTTPException(status_code=401, detail="Identifiants incorrects")
     
     merchant = response.data[0]
     return {"merchant_id": merchant["id"]}
@@ -247,46 +245,3 @@ def update_merchant_offer(req: UpdateOfferRequest):
     }).eq("id", req.merchant_id).execute()
     return {"status": "success"}
 
-@app.post("/callbacks/google-wallet")
-async def google_wallet_webhook(request: Request):
-    """Receives callback from Google Wallet when a pass is added or deleted."""
-    try:
-        content_type = request.headers.get("content-type", "")
-        body_bytes = await request.body()
-        print(f"WEBHOOK RAW BODY: {body_bytes}")
-        
-        payload = {}
-        if "application/json" in content_type:
-            try:
-                import json
-                body = json.loads(body_bytes)
-                if "signedMessage" in body:
-                    import jwt
-                    payload = jwt.decode(body["signedMessage"], options={"verify_signature": False})
-                else:
-                    payload = body
-            except Exception:
-                pass
-        else:
-            try:
-                import jwt
-                payload = jwt.decode(body_bytes.decode("utf-8"), options={"verify_signature": False})
-            except Exception:
-                pass
-
-        print(f"WEBHOOK PAYLOAD: {payload}")
-        
-        event_type = str(payload.get("eventType", "")).lower()
-        object_id = payload.get("objectObjectId") or payload.get("objectId") or ""
-        
-        if ("del" in event_type or "remove" in event_type) and object_id:
-            parts = object_id.split(".")
-            customer_id = parts[-1]
-            if supabase:
-                print(f"Deleting customer {customer_id} (Card removed from Wallet)")
-                supabase.table("customers").delete().eq("id", customer_id).execute()
-                    
-    except Exception as e:
-        print(f"Webhook error: {e}")
-        
-    return {"status": "ok"}
