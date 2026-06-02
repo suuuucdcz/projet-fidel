@@ -10,29 +10,59 @@ if (!merchantId) {
     console.log("No merchant_id in URL, using fallback test ID:", merchantId);
 }
 
+let mode = 'signup';
+
+function switchTab(newMode) {
+    mode = newMode;
+    document.getElementById('tab-signup').classList.remove('active');
+    document.getElementById('tab-login').classList.remove('active');
+    document.getElementById(`tab-${mode}`).classList.add('active');
+    
+    document.getElementById('error-message').style.display = 'none';
+    
+    if (mode === 'signup') {
+        document.getElementById('pin-label').innerText = "Choisissez un Code PIN (4 chiffres)";
+        document.getElementById('submit-btn').innerText = "Créer ma carte";
+    } else {
+        document.getElementById('pin-label').innerText = "Votre Code PIN Secret";
+        document.getElementById('submit-btn').innerText = "Retrouver ma carte";
+    }
+}
+window.switchTab = switchTab;
+switchTab('signup'); // init
+
 document.getElementById('signup-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     
     const firstName = document.getElementById('first-name').value;
     const lastName = document.getElementById('last-name').value;
+    const pinCode = document.getElementById('pin-code').value;
     const btn = document.getElementById('submit-btn');
+    const errorMsg = document.getElementById('error-message');
     
     btn.disabled = true;
-    btn.innerText = "Création en cours...";
+    btn.innerText = "Patientez...";
+    errorMsg.style.display = 'none';
 
     try {
         const response = await fetch(`${API_BASE_URL}/cards/generate/${merchantId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ first_name: firstName, last_name: lastName })
+            body: JSON.stringify({ first_name: firstName, last_name: lastName, pin_code: pinCode })
         });
 
-        if (!response.ok) throw new Error('Erreur lors de la création');
+        if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.detail || 'Erreur lors de la création');
+        }
         
         const data = await response.json();
         
         // Hide form, show link
         document.getElementById('signup-form').classList.add('hidden');
+        document.querySelector('.tabs').classList.add('hidden');
+        document.querySelector('h1').innerText = "Félicitations !";
+        
         const successArea = document.getElementById('success-area');
         successArea.classList.remove('hidden');
         
@@ -40,8 +70,9 @@ document.getElementById('signup-form').addEventListener('submit', async (e) => {
         document.getElementById('wallet-link').href = data.wallet_link;
         
     } catch (error) {
-        alert("Erreur: " + error.message);
+        errorMsg.innerText = error.message;
+        errorMsg.style.display = 'block';
         btn.disabled = false;
-        btn.innerText = "Générer ma carte";
+        btn.innerText = mode === 'signup' ? "Créer ma carte" : "Retrouver ma carte";
     }
 });

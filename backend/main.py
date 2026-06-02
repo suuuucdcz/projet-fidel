@@ -22,6 +22,7 @@ class LoginRequest(BaseModel):
 class GenerateCardRequest(BaseModel):
     first_name: str
     last_name: str
+    pin_code: str
 
 class ScanRequest(BaseModel):
     customer_id: str
@@ -69,26 +70,46 @@ def generate_card(merchant_id: str, req: GenerateCardRequest):
         raise HTTPException(status_code=404, detail="Merchant not found")
     merchant = m_res.data[0]
 
-    # Check if customer already exists for this merchant
-    existing_customers = supabase.table("customers").select("id").eq("first_name", req.first_name).eq("last_name", req.last_name).execute()
+    # Check if customer already exists (globally across merchants)
+    existing_customers = supabase.table("customers").select("id, pin_code").eq("first_name", req.first_name).eq("last_name", req.last_name).execute()
     
     customer_id = None
     points = 0
     
     if existing_customers.data:
+        # User found with this name. Verify PIN.
+        matched_cust = None
         for cust in existing_customers.data:
-            cid = cust["id"]
-            card_check = supabase.table("loyalty_cards").select("*").eq("customer_id", cid).eq("merchant_id", merchant_id).execute()
-            if card_check.data:
-                customer_id = cid
-                points = card_check.data[0]["points"]
+            if cust.get("pin_code") == req.pin_code:
+                matched_cust = cust
                 break
                 
+        if not matched_cust:
+            # Wrong PIN
+            raise HTTPException(status_code=401, detail="Code PIN incorrect pour ce nom. Si vous êtes une autre personne, veuillez ajouter l'initiale de votre 2ème prénom.")
+            
+        cid = matched_cust["id"]
+        # Check if they already have a card for THIS merchant
+        card_check = supabase.table("loyalty_cards").select("*").eq("customer_id", cid).eq("merchant_id", merchant_id).execute()
+        
+        if card_check.data:
+            customer_id = cid
+            points = card_check.data[0]["points"]
+        else:
+            customer_id = cid
+            supabase.table("loyalty_cards").insert({
+                "merchant_id": merchant_id,
+                "customer_id": customer_id,
+                "points": 0
+            }).execute()
+            points = 0
+                
     if not customer_id:
-        # Create NEW customer
+        # Create NEW customer profile
         customer_res = supabase.table("customers").insert({
             "first_name": req.first_name,
-            "last_name": req.last_name
+            "last_name": req.last_name,
+            "pin_code": req.pin_code
         }).execute()
         customer_id = customer_res.data[0]["id"]
         

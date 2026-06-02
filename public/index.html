@@ -42,6 +42,9 @@
             font-size: 16px; font-weight: bold; cursor: pointer;
             margin-top: 10px;
         }
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; background: rgba(0,0,0,0.4); padding: 5px; border-radius: 12px; }
+        .tab { flex: 1; padding: 12px; border: none; background: transparent; color: #A0A0A5; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: bold; transition: 0.2s; margin-top: 0;}
+        .tab.active { background: var(--surface); color: white; }
         .gpay-btn {
             background: black; color: white;
             border: 1px solid #333; display: flex; align-items: center; justify-content: center; gap: 10px;
@@ -54,6 +57,11 @@
         <h1>Créez votre carte</h1>
         <p style="color: #A0A0A5; font-size: 14px; margin-bottom: 24px;">Remplissez vos informations pour obtenir votre carte de fidélité digitale.</p>
         
+        <div class="tabs">
+            <button id="tab-signup" class="tab active" onclick="switchTab('signup')">Nouvelle Carte</button>
+            <button id="tab-login" class="tab" onclick="switchTab('login')">J'ai déjà une carte</button>
+        </div>
+
         <form id="signup-form">
             <div class="input-group">
                 <label>Prénom</label>
@@ -63,6 +71,11 @@
                 <label>Nom</label>
                 <input type="text" id="last-name" required placeholder="Dupont">
             </div>
+            <div class="input-group">
+                <label id="pin-label">Choisissez un Code PIN (4 chiffres)</label>
+                <input type="text" id="pin-code" required placeholder="1234" pattern="\d{4}" maxlength="4" inputmode="numeric">
+            </div>
+            <div id="error-message" style="color: #FF5252; font-size: 14px; margin-bottom: 10px; display: none;"></div>
             <button type="submit" id="submit-btn">Générer ma carte</button>
         </form>
 
