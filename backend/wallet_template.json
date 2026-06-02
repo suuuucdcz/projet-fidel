@@ -1,8 +1,8 @@
 {
   "issuerId": "3388000000023151997",
-  "classId": "3388000000023151997.loyalty_class_1",
+  "classId": "3388000000023151997.loyalty_class_v2",
   "loyaltyClass": {
-    "id": "3388000000023151997.loyalty_class_1",
+    "id": "3388000000023151997.loyalty_class_v2",
     "issuerName": "La Mie Câline",
     "programName": "Fidélité Gourmande",
     "programLogo": {
@@ -29,7 +29,7 @@
   },
   "loyaltyObject": {
     "id": "3388000000023151997.OBJECT_ID",
-    "classId": "3388000000023151997.loyalty_class_1",
+    "classId": "3388000000023151997.loyalty_class_v2",
     "state": "ACTIVE",
     "barcode": {
       "type": "QR_CODE",
