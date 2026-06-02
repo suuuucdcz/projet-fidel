@@ -9,6 +9,22 @@ if (!merchantId) {
     merchantId = '9d3a9145-e190-4cae-b278-006bb54dd602';
 }
 
+// Fetch merchant info to adapt the page
+async function loadMerchantInfo() {
+    try {
+        const res = await fetch(`${API_BASE_URL}/merchants/settings/${merchantId}`);
+        if (res.ok) {
+            const data = await res.json();
+            document.getElementById('page-title').innerText = `Bienvenue chez ${data.name}`;
+            document.getElementById('page-subtitle').innerText = `Créez votre carte de fidélité pour ${data.name} et profitez de : ${data.reward_description} !`;
+            document.title = `Carte de Fidélité - ${data.name}`;
+        }
+    } catch (e) {
+        console.error("Failed to load merchant info", e);
+    }
+}
+loadMerchantInfo();
+
 let mode = 'signup';
 
 function switchTab(newMode) {
