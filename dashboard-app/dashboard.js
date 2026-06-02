@@ -39,7 +39,7 @@ async function fetchAgencyData() {
                             <td><strong>${name}</strong></td>
                             <td><span class="badge">${c.points} pts</span></td>
                             <td style="color:gray; font-size:12px;">${new Date(c.created_at).toLocaleDateString()}</td>
-                            <td><button onclick="deleteCustomer('${m.id}', '${c.customer_id}')" style="background:none; color:red; border:none; cursor:pointer; font-size:12px; font-weight:bold;">Retirer</button></td>
+                            <td><button onclick="deleteCustomer('${m.id}', '${c.customer_id}')" style="background:transparent; color:#ff4444; border:1px solid #ff4444; border-radius:4px; padding:4px 8px; cursor:pointer; font-size:11px; font-weight:bold; transition:0.2s;" onmouseover="this.style.background='#ff4444'; this.style.color='white';" onmouseout="this.style.background='transparent'; this.style.color='#ff4444';">Retirer</button></td>
                         </tr>
                     `;
                 });
@@ -73,7 +73,7 @@ async function fetchAgencyData() {
                         <div class="merchant-title">${m.name}</div>
                         <div style="color:gray; font-size:14px;">${customers.length} clients</div>
                     </div>
-                    <button onclick="deleteMerchant('${m.id}')" style="background:red; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:bold;">Supprimer la boutique</button>
+                    <button onclick="deleteMerchant('${m.id}')" style="background:transparent; color: #ff4444; border: 1px solid #ff4444; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:bold; transition: 0.2s;" onmouseover="this.style.background='#ff4444'; this.style.color='white';" onmouseout="this.style.background='transparent'; this.style.color='#ff4444';">Supprimer la boutique</button>
                 </div>
                 
                 <form class="offer-form" onsubmit="updateOffer(event, '${m.id}')">

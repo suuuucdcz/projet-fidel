@@ -313,8 +313,8 @@ def delete_merchant(merchant_id: str):
 @app.delete("/dashboard/admin/customers/{merchant_id}/{customer_id}")
 def delete_customer_from_merchant(merchant_id: str, customer_id: str):
     if not supabase: raise HTTPException(status_code=500)
-    # Remove the loyalty card linking the customer to this merchant
-    supabase.table("loyalty_cards").delete().eq("merchant_id", merchant_id).eq("customer_id", customer_id).execute()
-    # Optional: We could check if they have other loyalty cards and if not delete from customers, but keeping them in customers is safer.
+    # Delete the customer entirely from the database
+    # ON DELETE CASCADE will automatically remove their loyalty_cards and scan_logs
+    supabase.table("customers").delete().eq("id", customer_id).execute()
     return {"status": "success"}
 
