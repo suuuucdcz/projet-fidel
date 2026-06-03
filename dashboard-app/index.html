@@ -36,6 +36,23 @@
         .qr-btn:hover { background: var(--primary); color: #000; }
         .danger-btn { color: #ff4444; border: 1px solid #ff4444; }
         .danger-btn:hover { background: #ff4444; color: #fff; }
+
+        /* Live card preview (Design tab) */
+        .offer-row { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 20px; }
+        .offer-row .offer-form { margin-bottom: 0; }
+        .card-preview { flex: 1 1 250px; min-width: 230px; }
+        .cp-card { border-radius: 16px; padding: 16px; color: #fff; box-shadow: 0 8px 24px rgba(0,0,0,0.4); overflow: hidden; transition: background 0.15s; }
+        .cp-head { display: flex; align-items: center; gap: 10px; }
+        .cp-logo { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; background: rgba(255,255,255,0.25); flex-shrink: 0; }
+        .cp-issuer { font-size: 13px; font-weight: 600; opacity: 0.95; }
+        .cp-program { font-size: 18px; font-weight: 800; margin-top: 12px; line-height: 1.2; word-break: break-word; }
+        .cp-points { margin-top: 12px; }
+        .cp-plabel { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.85; display: block; }
+        .cp-balance { font-size: 28px; font-weight: 800; }
+        .cp-hero { margin-top: 12px; border-radius: 10px; overflow: hidden; }
+        .cp-hero img { width: 100%; height: 84px; object-fit: cover; display: block; }
+        .cp-reward { font-size: 12px; margin-top: 12px; opacity: 0.9; word-break: break-word; }
+        .cp-caption { text-align: center; font-size: 11px; color: var(--text-muted); margin-top: 8px; }
         
         table { width: 100%; border-collapse: collapse; text-align: left; }
         th, td { padding: 12px; border-bottom: 1px solid var(--surface-border); font-size: 14px; }

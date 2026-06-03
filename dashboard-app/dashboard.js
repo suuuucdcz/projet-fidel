@@ -24,6 +24,46 @@ const LOYALTY_DESC = {
     cashback: 'X % du montant dépensé est crédité dans une cagnotte en €.'
 };
 
+// Pick black or white text for readability over a given background colour.
+function contrastText(hex) {
+    const h = String(hex || '').replace('#', '');
+    if (h.length !== 6) return '#ffffff';
+    const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+    const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return lum > 0.6 ? '#111111' : '#ffffff';
+}
+
+// Live card preview: re-read the design inputs and update the mock Wallet card.
+window.updateCardPreview = function (merchantId) {
+    const card = document.getElementById(`cp-card_${merchantId}`);
+    if (!card) return;
+    const val = (p) => { const el = document.getElementById(`${p}_${merchantId}`); return el ? el.value.trim() : ''; };
+    const setText = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
+
+    const color = val('color') || '#FF9800';
+    card.style.background = color;
+    card.style.color = contrastText(color);
+
+    setText(`cp-program_${merchantId}`, val('program') || card.dataset.name || '');
+    setText(`cp-plabel_${merchantId}`, val('plabel') || 'Points');
+    setText(`cp-reward_${merchantId}`, 'Objectif : ' + (val('desc') || '—'));
+
+    const logo = document.getElementById(`cp-logo_${merchantId}`);
+    const logoUrl = val('logo');
+    if (logo) {
+        if (logoUrl) { logo.src = logoUrl; logo.style.display = ''; }
+        else { logo.removeAttribute('src'); logo.style.display = 'none'; }
+    }
+
+    const heroWrap = document.getElementById(`cp-hero-wrap_${merchantId}`);
+    const hero = document.getElementById(`cp-hero_${merchantId}`);
+    const heroUrl = val('hero');
+    if (heroWrap && hero) {
+        if (heroUrl) { hero.src = heroUrl; heroWrap.style.display = ''; }
+        else { heroWrap.style.display = 'none'; }
+    }
+};
+
 // ==========================================
 // Admin authentication (minimal shared-secret guard)
 // ==========================================
@@ -170,6 +210,7 @@ function buildMerchantCardHTML(m, customersCount, rowsHTML, logsRowsHTML) {
     const showThresh = (loyaltyType === 'points' || loyaltyType === 'stamps') ? 'flex' : 'none';
     const showTiers = loyaltyType === 'tiers' ? 'flex' : 'none';
     const showCashback = loyaltyType === 'cashback' ? 'flex' : 'none';
+    const previewText = contrastText(m.color_hex || '#FF9800');
 
     return `
         <div class="merchant-header">
@@ -187,7 +228,8 @@ function buildMerchantCardHTML(m, customersCount, rowsHTML, logsRowsHTML) {
             </div>
         </div>
         
-        <form class="offer-form" onsubmit="updateOffer(event, '${m.id}')" style="flex-direction:column; align-items:stretch;">
+        <div class="offer-row">
+        <form class="offer-form" onsubmit="updateOffer(event, '${m.id}')" style="flex:2 1 360px; flex-direction:column; align-items:stretch;">
             <div class="offer-tabs">
                 <button type="button" class="offer-tab active" onclick="switchOfferTab(event, '${m.id}', 'offre')">Offre</button>
                 <button type="button" class="offer-tab" onclick="switchOfferTab(event, '${m.id}', 'design')">Design</button>
@@ -214,7 +256,7 @@ function buildMerchantCardHTML(m, customersCount, rowsHTML, logsRowsHTML) {
                     </div>
                     <div style="flex:2; min-width:150px;">
                         <label class="field-label">Récompense</label>
-                        <input type="text" id="desc_${m.id}" value="${rewardDesc}">
+                        <input type="text" id="desc_${m.id}" value="${rewardDesc}" oninput="updateCardPreview('${m.id}')">
                     </div>
                 </div>
 
@@ -237,23 +279,23 @@ function buildMerchantCardHTML(m, customersCount, rowsHTML, logsRowsHTML) {
             <div id="otab-design_${m.id}" class="offer-pane" style="display:none;">
                 <div style="flex:1; min-width:100px;">
                     <label class="field-label">Couleur (Hex)</label>
-                    <input type="color" id="color_${m.id}" value="${colorHex}" style="height:44px; padding:2px;">
+                    <input type="color" id="color_${m.id}" value="${colorHex}" style="height:44px; padding:2px;" oninput="updateCardPreview('${m.id}')">
                 </div>
                 <div style="flex:2; min-width:200px;">
                     <label class="field-label">Nom du programme</label>
-                    <input type="text" id="program_${m.id}" value="${programName}" placeholder="${name}" maxlength="100">
+                    <input type="text" id="program_${m.id}" value="${programName}" placeholder="${name}" maxlength="100" oninput="updateCardPreview('${m.id}')">
                 </div>
                 <div style="flex:1; min-width:120px;">
                     <label class="field-label">Libellé des points</label>
-                    <input type="text" id="plabel_${m.id}" value="${pointsLabel}" placeholder="Points" maxlength="30">
+                    <input type="text" id="plabel_${m.id}" value="${pointsLabel}" placeholder="Points" maxlength="30" oninput="updateCardPreview('${m.id}')">
                 </div>
                 <div style="flex:2; min-width:200px;">
                     <label class="field-label">Lien Logo (URL)</label>
-                    <input type="url" id="logo_${m.id}" value="${logoUrl}" placeholder="https://...">
+                    <input type="url" id="logo_${m.id}" value="${logoUrl}" placeholder="https://..." oninput="updateCardPreview('${m.id}')">
                 </div>
                 <div style="flex:2; min-width:200px;">
                     <label class="field-label">Lien Couverture (URL)</label>
-                    <input type="url" id="hero_${m.id}" value="${heroUrl}" placeholder="https://...">
+                    <input type="url" id="hero_${m.id}" value="${heroUrl}" placeholder="https://..." oninput="updateCardPreview('${m.id}')">
                 </div>
             </div>
 
@@ -273,6 +315,26 @@ function buildMerchantCardHTML(m, customersCount, rowsHTML, logsRowsHTML) {
                 <button type="submit" class="btn-accent" style="width:auto; padding:10px 20px;">Sauvegarder les paramètres</button>
             </div>
         </form>
+
+        <div class="card-preview">
+            <div class="cp-card" id="cp-card_${m.id}" data-name="${name}" style="background:${colorHex}; color:${previewText};">
+                <div class="cp-head">
+                    <img class="cp-logo" id="cp-logo_${m.id}" src="${logoUrl}" alt="" style="${logoUrl ? '' : 'display:none;'}" onerror="this.style.display='none'">
+                    <div class="cp-issuer">${name}</div>
+                </div>
+                <div class="cp-program" id="cp-program_${m.id}">${programName || name}</div>
+                <div class="cp-points">
+                    <span class="cp-plabel" id="cp-plabel_${m.id}">${pointsLabel}</span>
+                    <span class="cp-balance">120</span>
+                </div>
+                <div class="cp-hero" id="cp-hero-wrap_${m.id}" style="${heroUrl ? '' : 'display:none;'}">
+                    <img id="cp-hero_${m.id}" src="${heroUrl}" alt="" onerror="this.parentElement.style.display='none'">
+                </div>
+                <div class="cp-reward" id="cp-reward_${m.id}">Objectif : ${rewardDesc || '—'}</div>
+            </div>
+            <div class="cp-caption">Aperçu de la carte (indicatif)</div>
+        </div>
+        </div>
 
         <div style="display:flex; gap: 20px; margin-top: 15px;">
             <div style="flex: 1; background: rgba(0,0,0,0.2); border-radius: 8px; overflow:hidden;">
