@@ -53,7 +53,9 @@
             </div>
             
             <div id="reader" class="scanner-view"></div>
-            
+
+            <div id="scan-error" class="error-msg hidden"></div>
+
             <div id="scan-result" class="result-card hidden">
                 <div class="success-checkmark">
                     <svg class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
@@ -61,9 +63,10 @@
                         <path class="checkmark__check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
                     </svg>
                 </div>
-                <h3>Point Validé !</h3>
-                <p id="points-status">Nouveau solde: X points</p>
-                <button id="next-scan-btn" class="btn-secondary">Scanner le suivant</button>
+                <h3 id="result-title">Validé !</h3>
+                <p id="points-status">—</p>
+                <button id="next-scan-btn" class="btn-primary">Client suivant</button>
+                <p class="result-hint">La caméra repart automatiquement.</p>
             </div>
 
             <!-- Cashback panel (shown instead of the point result for cashback merchants) -->

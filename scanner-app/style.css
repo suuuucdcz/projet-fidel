@@ -213,6 +213,31 @@ button:active {
     margin-bottom: 24px;
 }
 
+/* Bigger, glanceable scan result */
+#points-status {
+    font-size: 18px;
+    color: var(--text-main);
+}
+#points-status strong {
+    font-size: 30px;
+    font-weight: 800;
+    color: var(--text-main);
+}
+.result-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 12px;
+}
+
+/* Inline scan error banner (replaces blocking alerts) */
+#scan-error {
+    background: rgba(255, 0, 84, 0.12);
+    border: 1px solid var(--error);
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 12px;
+}
+
 /* Animated Checkmark */
 .success-checkmark {
     width: 80px;

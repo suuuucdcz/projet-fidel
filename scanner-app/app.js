@@ -124,6 +124,64 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
 document.getElementById('logout-btn').addEventListener('click', forceLogout);
 
 // ==========================================
+// Counter feedback (sound + vibration) — fast, eyes-free confirmation
+// ==========================================
+let audioCtx = null;
+// Browsers require a user gesture before audio can play; unlock on first interaction.
+document.addEventListener('click', () => {
+    try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+    } catch (e) { /* no audio available */ }
+}, { passive: true });
+
+function tone(freq, durationMs, when = 0, type = 'sine', gain = 0.15) {
+    try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        g.gain.value = gain;
+        osc.connect(g); g.connect(audioCtx.destination);
+        const t = audioCtx.currentTime + when;
+        osc.start(t);
+        osc.stop(t + durationMs / 1000);
+    } catch (e) { /* ignore */ }
+}
+function vibrate(pattern) { try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {} }
+
+function feedbackSuccess() { tone(880, 110); vibrate(50); }
+function feedbackReward() { tone(660, 110); tone(880, 110, 0.12); tone(1175, 240, 0.24); vibrate([60, 50, 140]); }
+function feedbackError() { tone(180, 260, 0, 'square', 0.12); vibrate([120, 60, 120]); }
+
+// ==========================================
+// Scan flow state (duplicate guard + auto-resume)
+// ==========================================
+let lastScanCode = null;
+let lastScanTime = 0;
+let autoResumeTimer = null;
+const DUP_WINDOW_MS = 4000;   // ignore the same card re-read within this window
+const AUTO_RESUME_MS = 2500;  // camera comes back on its own after a normal scan
+
+function scheduleAutoResume(ms) {
+    clearTimeout(autoResumeTimer);
+    autoResumeTimer = setTimeout(() => {
+        // Only resume if we're still on the scanner screen.
+        if (scannerSection && !scannerSection.classList.contains('hidden')) startScanner();
+    }, ms);
+}
+
+function showScanError(msg) {
+    const el = document.getElementById('scan-error');
+    if (!el) { alert(msg); return; }
+    el.innerText = msg;
+    el.classList.remove('hidden');
+    clearTimeout(showScanError._t);
+    showScanError._t = setTimeout(() => el.classList.add('hidden'), 3500);
+}
+
+// ==========================================
 // Scanner Logic
 // ==========================================
 function showScanner() {
@@ -155,9 +213,12 @@ async function loadMerchantType() {
 let scannerBusy = false;
 
 async function startScanner() {
+    clearTimeout(autoResumeTimer);
     readerDiv.classList.remove('hidden');
     resultCard.classList.add('hidden');
     if (cashbackPanel) cashbackPanel.classList.add('hidden');
+    const errEl = document.getElementById('scan-error');
+    if (errEl) errEl.classList.add('hidden');
 
     if (!html5QrCode) {
         html5QrCode = new Html5Qrcode("reader");
@@ -230,6 +291,13 @@ document.addEventListener('visibilitychange', () => {
 });
 
 async function onScanSuccess(decodedText, decodedResult) {
+    // Duplicate guard: ignore the same card re-read within a short window so a phone
+    // left in front of the camera isn't counted several times.
+    const now = Date.now();
+    if (decodedText === lastScanCode && (now - lastScanTime) < DUP_WINDOW_MS) return;
+    lastScanCode = decodedText;
+    lastScanTime = now;
+
     await stopScanner();
     readerDiv.classList.add('hidden');
 
@@ -241,6 +309,7 @@ async function onScanSuccess(decodedText, decodedResult) {
 }
 
 async function doPointScan(customerId) {
+    const resultTitle = document.getElementById('result-title');
     try {
         const response = await authFetch(`${API_BASE_URL}/cards/scan`, {
             method: 'POST',
@@ -251,20 +320,28 @@ async function doPointScan(customerId) {
         if (!response.ok) throw new Error('Erreur lors du scan (carte introuvable ou erreur serveur)');
 
         const data = await response.json();
+        const who = data.customer_name ? `${data.customer_name} · ` : '';
 
         if (data.reward_triggered) {
-            pointsStatus.innerText = `Récompense débloquée ! (${data.reward_desc})`;
-            pointsStatus.style.color = "var(--success)";
+            feedbackReward();
+            if (resultTitle) resultTitle.innerText = '🎁 Récompense !';
+            pointsStatus.innerHTML = `${who}<strong>${data.reward_desc || 'Récompense débloquée'}</strong>`;
+            pointsStatus.style.color = "var(--primary)";
             pointsStatus.style.fontWeight = "bold";
         } else {
-            pointsStatus.innerText = `Nouveau solde: ${data.new_points} points`;
+            feedbackSuccess();
+            if (resultTitle) resultTitle.innerText = 'Validé !';
+            pointsStatus.innerHTML = `${who}<strong>${data.new_points}</strong> pts`;
             pointsStatus.style.color = "var(--text-muted)";
             pointsStatus.style.fontWeight = "normal";
         }
 
         resultCard.classList.remove('hidden');
+        // Hands-free: camera comes back on its own (reward stays a bit longer to read).
+        scheduleAutoResume(data.reward_triggered ? 4000 : AUTO_RESUME_MS);
     } catch (error) {
-        alert(error.message);
+        feedbackError();
+        showScanError(error.message);
         startScanner();
     }
 }
@@ -289,7 +366,8 @@ async function showCashbackPanel(customerId) {
         const res = await authFetch(`${API_BASE_URL}/cards/info/${encodeURIComponent(customerId)}`);
         if (!res.ok) throw new Error('Carte introuvable');
         const data = await res.json();
-        if (balanceEl) balanceEl.innerText = `Cagnotte actuelle : ${fmtEur(data.balance)}`;
+        const who = data.customer_name ? `${data.customer_name} · ` : '';
+        if (balanceEl) balanceEl.innerText = `${who}Cagnotte : ${fmtEur(data.balance)}`;
     } catch (error) {
         if (balanceEl) balanceEl.innerText = 'Cagnotte : (indisponible)';
     }
@@ -307,7 +385,8 @@ async function sendCashback(operation, amount) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Erreur cashback');
 
-        if (balanceEl) balanceEl.innerText = `Cagnotte actuelle : ${fmtEur(data.balance)}`;
+        feedbackSuccess();
+        if (balanceEl) balanceEl.innerText = `Cagnotte : ${fmtEur(data.balance)}`;
         if (msgEl) {
             msgEl.style.color = 'var(--success)';
             msgEl.innerText = operation === 'earn'
@@ -316,7 +395,8 @@ async function sendCashback(operation, amount) {
         }
         document.getElementById('cashback-amount').value = '';
     } catch (error) {
-        if (msgEl) { msgEl.style.color = 'var(--danger, #ff5252)'; msgEl.innerText = error.message; }
+        feedbackError();
+        if (msgEl) { msgEl.style.color = 'var(--error)'; msgEl.innerText = error.message; }
     }
 }
 

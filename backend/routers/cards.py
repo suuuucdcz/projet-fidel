@@ -176,7 +176,10 @@ def scan_card(req: ScanRequest, merchant_id: str = Depends(get_current_merchant_
     except Exception as e:
         print(f"Warning: Failed to push update to wallet: {e}")
 
-    return {"status": "success", "new_points": new_points, "reward_triggered": reward_triggered, "reward_desc": reward_unlocked_desc if reward_triggered else None}
+    cust = supabase.table("customers").select("first_name").eq("id", req.customer_id).execute()
+    customer_name = cust.data[0]["first_name"] if cust.data else None
+
+    return {"status": "success", "new_points": new_points, "reward_triggered": reward_triggered, "reward_desc": reward_unlocked_desc if reward_triggered else None, "customer_name": customer_name}
 
 
 @router.get("/info/{customer_id}")
@@ -188,7 +191,9 @@ def card_info(customer_id: str, merchant_id: str = Depends(get_current_merchant_
     if not card_res.data:
         raise HTTPException(status_code=404, detail="Loyalty card not found")
     row = card_res.data[0]
-    return {"points": row.get("points", 0), "balance": float(row.get("balance") or 0)}
+    cust = supabase.table("customers").select("first_name").eq("id", customer_id).execute()
+    customer_name = cust.data[0]["first_name"] if cust.data else None
+    return {"points": row.get("points", 0), "balance": float(row.get("balance") or 0), "customer_name": customer_name}
 
 
 @router.post("/cashback")
