@@ -142,6 +142,43 @@ class GoogleWalletService:
              
         return f"https://pay.google.com/gp/v/save/{token}"
 
+    def update_class(self, merchant_id: str, merchant_name: str, program_name: str = "", color_hex: str = "", logo_url: str = "", hero_url: str = "", phone: str = "", website: str = ""):
+        """PATCH the merchant's Wallet class so design changes (name, logo, banner, colour,
+        links) reflect on ALL cards already saved by customers — not just new ones."""
+        class_id = f"{self.issuer_id}.class_{merchant_id}"
+        url = f"{self.base_url}/loyaltyClass/{class_id}"
+
+        patch = {
+            "issuerName": merchant_name,
+            "programName": program_name or merchant_name,
+        }
+        if color_hex:
+            patch["hexBackgroundColor"] = color_hex
+        if logo_url:
+            patch["programLogo"] = {"sourceUri": {"uri": logo_url}}
+        if hero_url:
+            patch["heroImage"] = {"sourceUri": {"uri": hero_url}}
+
+        links = []
+        if phone:
+            links.append({"uri": f"tel:{phone}", "description": "Téléphone", "id": "phone"})
+        if website:
+            uri = website if website.startswith("http") else f"https://{website}"
+            links.append({"uri": uri, "description": "Site web", "id": "website"})
+        if links:
+            patch["linksModuleData"] = {"uris": links}
+
+        headers = self._get_auth_headers()
+        response = requests.patch(url, headers=headers, json=patch)
+        if response.status_code == 404:
+            # No class yet (no card generated for this merchant) -> nothing to update;
+            # it will be created with these values on the first card.
+            print(f"Wallet class {class_id} not found yet; nothing to sync.")
+            return None
+        if response.status_code != 200:
+            print(f"Failed to update Wallet class: {response.text}")
+        return response.json() if response.status_code == 200 else None
+
     def update_points(self, customer_id: str, new_points: int, threshold: int, reward_desc: str, reward_unlocked: bool = False):
         """
         Updates an existing LoyaltyObject in Google Wallet and triggers a notification.

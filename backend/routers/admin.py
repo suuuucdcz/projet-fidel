@@ -3,6 +3,7 @@ import os
 from fastapi import APIRouter, HTTPException, Header, Depends
 from schemas import UpdateOfferRequest, CreateMerchantRequest
 from db import supabase
+from wallet_service import wallet_service
 from passlib.context import CryptContext
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -69,6 +70,27 @@ def update_merchant_offer(req: UpdateOfferRequest):
         raise HTTPException(status_code=400, detail="Aucun champ à mettre à jour")
 
     supabase.table("merchants").update(updates).eq("id", req.merchant_id).execute()
+
+    # Propagate design to the Google Wallet class so cards ALREADY saved by customers
+    # update too (name, logo, banner, colour, links). Re-read the full design first.
+    try:
+        m = supabase.table("merchants").select(
+            "name, program_name, color_hex, logo_url, hero_url, phone, website"
+        ).eq("id", req.merchant_id).execute()
+        if m.data:
+            mm = m.data[0]
+            wallet_service.update_class(
+                req.merchant_id, mm["name"],
+                program_name=mm.get("program_name") or "",
+                color_hex=mm.get("color_hex") or "",
+                logo_url=mm.get("logo_url") or "",
+                hero_url=mm.get("hero_url") or "",
+                phone=mm.get("phone") or "",
+                website=mm.get("website") or "",
+            )
+    except Exception as e:
+        print(f"Warning: Wallet class sync failed: {e}")
+
     return {"status": "success"}
 
 @router.post("/admin/merchants/create", dependencies=[Depends(require_admin)])
