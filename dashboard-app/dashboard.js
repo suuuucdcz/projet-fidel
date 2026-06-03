@@ -3,12 +3,51 @@ const API_BASE_URL = 'https://projet-fidel.onrender.com';
 document.addEventListener('DOMContentLoaded', fetchAgencyData);
 
 // ==========================================
+// Security helper
+// ==========================================
+// All merchant- and customer-controlled values (names, reward text, image URLs)
+// are injected into innerHTML below. Escape them to prevent stored XSS.
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+}
+
+// ==========================================
+// Admin authentication (minimal shared-secret guard)
+// ==========================================
+// The backend protects /dashboard/admin/* with an X-Admin-Token header that must
+// match its ADMIN_TOKEN env var. We ask for it once and keep it in localStorage.
+function getAdminToken() {
+    let token = localStorage.getItem('admin_token');
+    if (!token) {
+        token = prompt('Mot de passe administrateur (agence) :') || '';
+        if (token) localStorage.setItem('admin_token', token);
+    }
+    return token;
+}
+
+async function adminFetch(url, options = {}) {
+    const headers = { ...(options.headers || {}), 'X-Admin-Token': getAdminToken() };
+    const res = await fetch(url, { ...options, headers });
+    if (res.status === 401) {
+        // Wrong/expired secret — forget it so the next call prompts again.
+        localStorage.removeItem('admin_token');
+        throw new Error('Accès refusé : mot de passe administrateur invalide.');
+    }
+    return res;
+}
+
+// ==========================================
 // API Calls
 // ==========================================
 
 async function fetchAgencyData() {
     try {
-        const res = await fetch(`${API_BASE_URL}/dashboard/admin/merchants`);
+        const res = await adminFetch(`${API_BASE_URL}/dashboard/admin/merchants`);
         const merchants = await res.json();
         
         const container = document.getElementById('merchants-list');
@@ -19,19 +58,23 @@ async function fetchAgencyData() {
             return;
         }
 
-        for (const m of merchants) {
-            const custRes = await fetch(`${API_BASE_URL}/dashboard/customers/${m.id}`);
-            const customers = await custRes.json();
-            
-            const logsRes = await fetch(`${API_BASE_URL}/dashboard/admin/logs/${m.id}`);
-            const logs = await logsRes.json();
-            
+        // Fetch every merchant's customers + logs concurrently instead of
+        // sequentially (was an N+1 waterfall that got slow with many merchants).
+        const details = await Promise.all(merchants.map(async (m) => {
+            const [custRes, logsRes] = await Promise.all([
+                fetch(`${API_BASE_URL}/dashboard/customers/${m.id}`),
+                adminFetch(`${API_BASE_URL}/dashboard/admin/logs/${m.id}`),
+            ]);
+            return { m, customers: await custRes.json(), logs: await logsRes.json() };
+        }));
+
+        for (const { m, customers, logs } of details) {
             const card = document.createElement('div');
             card.className = 'merchant-card';
-            
+
             const rows = buildCustomersTableRows(m.id, customers);
             const logsRows = buildLogsTableRows(logs);
-            
+
             card.innerHTML = buildMerchantCardHTML(m, customers.length, rows, logsRows);
             container.appendChild(card);
         }
@@ -51,7 +94,8 @@ function buildCustomersTableRows(merchantId, customers) {
     }
     
     return customers.map(c => {
-        const name = c.customers ? `${c.customers.first_name || ''} ${c.customers.last_name || ''}` : 'Inconnu';
+        const rawName = c.customers ? `${c.customers.first_name || ''} ${c.customers.last_name || ''}`.trim() : '';
+        const name = escapeHtml(rawName || 'Inconnu');
         return `
             <tr>
                 <td><strong>${name}</strong></td>
@@ -76,7 +120,8 @@ function buildLogsTableRows(logs) {
     }
     
     return logs.map(l => {
-        const clientName = l.customers ? `${l.customers.first_name || ''} ${l.customers.last_name || ''}` : 'Inconnu';
+        const rawClientName = l.customers ? `${l.customers.first_name || ''} ${l.customers.last_name || ''}`.trim() : '';
+        const clientName = escapeHtml(rawClientName || 'Inconnu');
         let actionText = '';
         let actionColor = 'gray';
         
@@ -97,11 +142,17 @@ function buildLogsTableRows(logs) {
 function buildMerchantCardHTML(m, customersCount, rowsHTML, logsRowsHTML) {
     const signupUrl = `https://projet-fidel.vercel.app/?merchant_id=${m.id}`;
     const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(signupUrl)}`;
-    
+
+    const name = escapeHtml(m.name);
+    const rewardDesc = escapeHtml(m.reward_description ?? '');
+    const colorHex = escapeHtml(m.color_hex || '#FF9800');
+    const logoUrl = escapeHtml(m.logo_url || '');
+    const heroUrl = escapeHtml(m.hero_url || '');
+
     return `
         <div class="merchant-header">
             <div>
-                <div class="merchant-title">${m.name}</div>
+                <div class="merchant-title">${name}</div>
                 <div style="color:gray; font-size:14px;">${customersCount} clients</div>
             </div>
             <div style="display:flex; gap:10px; align-items:center;">
@@ -123,23 +174,23 @@ function buildMerchantCardHTML(m, customersCount, rowsHTML, logsRowsHTML) {
         <form class="offer-form" onsubmit="updateOffer(event, '${m.id}')" style="flex-wrap: wrap;">
             <div style="flex:1; min-width:120px;">
                 <label style="font-size:12px; color:gray;">Seuil (Points)</label>
-                <input type="number" id="thresh_${m.id}" value="${m.reward_threshold}" required>
+                <input type="number" id="thresh_${m.id}" value="${escapeHtml(m.reward_threshold)}" required>
             </div>
             <div style="flex:2; min-width:200px;">
                 <label style="font-size:12px; color:gray;">Récompense</label>
-                <input type="text" id="desc_${m.id}" value="${m.reward_description}" required>
+                <input type="text" id="desc_${m.id}" value="${rewardDesc}" required>
             </div>
             <div style="flex:1; min-width:100px;">
                 <label style="font-size:12px; color:gray;">Couleur (Hex)</label>
-                <input type="color" id="color_${m.id}" value="${m.color_hex || '#FF9800'}" style="height:44px; padding:2px;">
+                <input type="color" id="color_${m.id}" value="${colorHex}" style="height:44px; padding:2px;">
             </div>
             <div style="flex:2; min-width:200px;">
                 <label style="font-size:12px; color:gray;">Lien Logo (URL)</label>
-                <input type="url" id="logo_${m.id}" value="${m.logo_url || ''}" placeholder="https://...">
+                <input type="url" id="logo_${m.id}" value="${logoUrl}" placeholder="https://...">
             </div>
             <div style="flex:2; min-width:200px;">
                 <label style="font-size:12px; color:gray;">Lien Couverture (URL)</label>
-                <input type="url" id="hero_${m.id}" value="${m.hero_url || ''}" placeholder="https://...">
+                <input type="url" id="hero_${m.id}" value="${heroUrl}" placeholder="https://...">
             </div>
             <div style="display:flex; align-items:flex-end; width:100%; margin-top:10px;">
                 <button type="submit" class="btn-accent">Sauvegarder les paramètres</button>
@@ -227,7 +278,7 @@ document.getElementById('create-merchant-form').addEventListener('submit', async
     errorMsg.style.display = 'none';
     
     try {
-        const res = await fetch(`${API_BASE_URL}/dashboard/admin/merchants/create`, {
+        const res = await adminFetch(`${API_BASE_URL}/dashboard/admin/merchants/create`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ name, email, password })
@@ -258,7 +309,7 @@ window.deleteCustomer = async function(merchantId, customerId) {
     if (!confirm("Voulez-vous vraiment retirer cette carte de fidélité pour ce client ?")) return;
     
     try {
-        const res = await fetch(`${API_BASE_URL}/dashboard/admin/customers/${merchantId}/${customerId}`, {
+        const res = await adminFetch(`${API_BASE_URL}/dashboard/admin/customers/${merchantId}/${customerId}`, {
             method: 'DELETE'
         });
         if (!res.ok) throw new Error("Erreur lors de la suppression du client");
@@ -273,7 +324,7 @@ window.deleteMerchant = async function(merchantId) {
     if (!confirm("ATTENTION : Êtes-vous sûr de vouloir supprimer définitivement cette boutique, tous ses historiques, et TOUTES les cartes de fidélité de ses clients ?")) return;
     
     try {
-        const res = await fetch(`${API_BASE_URL}/dashboard/admin/merchants/${merchantId}`, {
+        const res = await adminFetch(`${API_BASE_URL}/dashboard/admin/merchants/${merchantId}`, {
             method: 'DELETE'
         });
         if (!res.ok) throw new Error("Erreur lors de la suppression de la boutique");

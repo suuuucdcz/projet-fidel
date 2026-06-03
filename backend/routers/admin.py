@@ -1,10 +1,27 @@
-from fastapi import APIRouter, HTTPException
+import os
+
+from fastapi import APIRouter, HTTPException, Header, Depends
 from schemas import UpdateOfferRequest, CreateMerchantRequest
 from db import supabase
 from passlib.context import CryptContext
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 router = APIRouter(prefix="/dashboard", tags=["admin"])
+
+# Minimal agency-admin guard: endpoints that manage merchants/customers globally
+# require the X-Admin-Token header to match the ADMIN_TOKEN env var.
+# If ADMIN_TOKEN is unset we stay backward-compatible (open) but warn loudly, so an
+# existing deployment keeps working until the env var is configured on Render.
+ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "")
+
+
+def require_admin(x_admin_token: str | None = Header(default=None)):
+    if not ADMIN_TOKEN:
+        print("WARNING: ADMIN_TOKEN not set — agency admin endpoints are UNPROTECTED. "
+              "Set ADMIN_TOKEN in the backend environment to enable the guard.")
+        return
+    if x_admin_token != ADMIN_TOKEN:
+        raise HTTPException(status_code=401, detail="Jeton administrateur invalide")
 
 @router.get("/stats/{merchant_id}")
 def get_dashboard_stats(merchant_id: str):
@@ -22,7 +39,7 @@ def get_dashboard_customers(merchant_id: str):
     res = supabase.table("loyalty_cards").select("customer_id, points, created_at, customers(first_name, last_name)").eq("merchant_id", merchant_id).order("created_at", desc=True).execute()
     return res.data
 
-@router.get("/admin/merchants")
+@router.get("/admin/merchants", dependencies=[Depends(require_admin)])
 def get_all_merchants():
     """Fetches all merchants for the Super-Admin Agency dashboard"""
     if not supabase: return []
@@ -31,18 +48,20 @@ def get_all_merchants():
 
 @router.post("/admin/update_offer")
 def update_merchant_offer(req: UpdateOfferRequest):
-    """Update reward threshold and description for a merchant"""
+    """Update reward/design fields for a merchant. Only the fields actually provided
+    are written, so a partial caller (e.g. the scanner app editing just the offer)
+    never erases the design fields (color/logo/hero) it didn't send."""
     if not supabase: raise HTTPException(status_code=500)
-    supabase.table("merchants").update({
-        "reward_threshold": req.reward_threshold,
-        "reward_description": req.reward_description,
-        "color_hex": req.color_hex,
-        "logo_url": req.logo_url,
-        "hero_url": req.hero_url
-    }).eq("id", req.merchant_id).execute()
+
+    updatable = ("reward_threshold", "reward_description", "color_hex", "logo_url", "hero_url")
+    updates = {f: getattr(req, f) for f in updatable if getattr(req, f) is not None}
+    if not updates:
+        raise HTTPException(status_code=400, detail="Aucun champ à mettre à jour")
+
+    supabase.table("merchants").update(updates).eq("id", req.merchant_id).execute()
     return {"status": "success"}
 
-@router.post("/admin/merchants/create")
+@router.post("/admin/merchants/create", dependencies=[Depends(require_admin)])
 def create_merchant(req: CreateMerchantRequest):
     """Create a new merchant account with hashed password"""
     if not supabase: raise HTTPException(status_code=500)
@@ -62,19 +81,19 @@ def create_merchant(req: CreateMerchantRequest):
     
     return {"status": "success", "merchant_id": res.data[0]["id"]}
 
-@router.get("/admin/logs/{merchant_id}")
+@router.get("/admin/logs/{merchant_id}", dependencies=[Depends(require_admin)])
 def get_merchant_logs(merchant_id: str):
     if not supabase: return []
     res = supabase.table("scan_logs").select("action_type, created_at, points_added, customers(first_name, last_name)").eq("merchant_id", merchant_id).order("created_at", desc=True).limit(50).execute()
     return res.data
 
-@router.delete("/admin/merchants/{merchant_id}")
+@router.delete("/admin/merchants/{merchant_id}", dependencies=[Depends(require_admin)])
 def delete_merchant(merchant_id: str):
     if not supabase: raise HTTPException(status_code=500)
     supabase.table("merchants").delete().eq("id", merchant_id).execute()
     return {"status": "success"}
 
-@router.delete("/admin/customers/{merchant_id}/{customer_id}")
+@router.delete("/admin/customers/{merchant_id}/{customer_id}", dependencies=[Depends(require_admin)])
 def delete_customer_from_merchant(merchant_id: str, customer_id: str):
     if not supabase: raise HTTPException(status_code=500)
     # Delete the customer entirely from the database

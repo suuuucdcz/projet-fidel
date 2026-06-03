@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -6,11 +8,23 @@ from routers import merchants, cards, marketing, admin
 
 app = FastAPI(title="Loyalty Cards Agency Platform API")
 
+# Allowed front-end origins. Override in production via the ALLOWED_ORIGINS env var
+# (comma-separated). We do NOT use cookies, so allow_credentials stays False, which
+# also lets us keep an explicit, safe allow-list instead of the invalid "*" + creds combo.
+_default_origins = [
+    "https://projet-fidel.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5500",
+]
+_env_origins = os.environ.get("ALLOWED_ORIGINS", "")
+allowed_origins = [o.strip() for o in _env_origins.split(",") if o.strip()] or _default_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=allowed_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 

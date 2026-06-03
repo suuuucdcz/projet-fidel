@@ -16,13 +16,16 @@ def login(req: LoginRequest):
         raise HTTPException(status_code=401, detail="Identifiants incorrects")
     
     merchant = response.data[0]
-    
-    # Check password
-    if not pwd_context.verify(req.password, merchant["password_hash"]):
-        # Special fallback for the old test account which wasn't hashed
-        if req.password != merchant["password_hash"]:
-             raise HTTPException(status_code=401, detail="Identifiants incorrects")
-    
+
+    # Check password. verify() can raise if the stored value isn't a valid bcrypt
+    # hash (e.g. a legacy plaintext seed row) — treat any such case as invalid.
+    try:
+        valid = pwd_context.verify(req.password, merchant["password_hash"])
+    except Exception:
+        valid = False
+    if not valid:
+        raise HTTPException(status_code=401, detail="Identifiants incorrects")
+
     return {"merchant_id": merchant["id"]}
 
 @router.get("/settings/{merchant_id}")

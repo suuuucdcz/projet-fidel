@@ -264,9 +264,11 @@ document.getElementById('settings-form').addEventListener('submit', async (e) =>
     }
 });
 
-// PWA Service Worker Registration
+// PWA Service Worker Registration (relative path so it works on any host/sub-path).
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        // navigator.serviceWorker.register('/sw.js');
+        navigator.serviceWorker.register('./sw.js').catch((err) => {
+            console.error('Service worker registration failed:', err);
+        });
     });
 }
