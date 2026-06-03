@@ -26,6 +26,16 @@
         .offer-tab { width: auto; padding: 8px 16px; font-size: 13px; font-weight: 600; background: rgba(255,255,255,0.05); color: var(--text-muted); border: 1px solid var(--surface-border); border-radius: 8px; cursor: pointer; transition: 0.15s; }
         .offer-tab.active { background: var(--primary); color: #000; border-color: var(--primary); }
         .offer-pane { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; }
+
+        /* Reusable bits (extracted from inline styles) */
+        .field-label { display: block; font-size: 12px; color: gray; margin-bottom: 4px; }
+        .chip-btn { width: max-content; padding: 4px 8px; border-radius: 4px; cursor: pointer;
+                    font-size: 11px; font-weight: bold; transition: 0.2s; white-space: nowrap;
+                    background: transparent; text-decoration: none; }
+        .qr-btn { color: var(--primary); border: 1px solid var(--primary); }
+        .qr-btn:hover { background: var(--primary); color: #000; }
+        .danger-btn { color: #ff4444; border: 1px solid #ff4444; }
+        .danger-btn:hover { background: #ff4444; color: #fff; }
         
         table { width: 100%; border-collapse: collapse; text-align: left; }
         th, td { padding: 12px; border-bottom: 1px solid var(--surface-border); font-size: 14px; }

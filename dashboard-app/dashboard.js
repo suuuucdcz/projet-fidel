@@ -110,10 +110,7 @@ function buildCustomersTableRows(merchantId, customers) {
                 <td><span class="badge">${c.points} pts</span></td>
                 <td style="color:gray; font-size:12px;">${new Date(c.created_at).toLocaleDateString()}</td>
                 <td>
-                    <button onclick="deleteCustomer('${merchantId}', '${c.customer_id}')" 
-                        style="background:transparent; color:#ff4444; border:1px solid #ff4444; border-radius:4px; padding:4px 8px; cursor:pointer; font-size:11px; font-weight:bold; transition:0.2s;" 
-                        onmouseover="this.style.background='#ff4444'; this.style.color='white';" 
-                        onmouseout="this.style.background='transparent'; this.style.color='#ff4444';">
+                    <button onclick="deleteCustomer('${merchantId}', '${c.customer_id}')" class="chip-btn danger-btn">
                         Retirer
                     </button>
                 </td>
@@ -175,16 +172,10 @@ function buildMerchantCardHTML(m, customersCount, rowsHTML, logsRowsHTML) {
                 <div style="color:gray; font-size:14px;">${customersCount} clients</div>
             </div>
             <div style="display:flex; gap:10px; align-items:center;">
-                <a href="${qrCodeUrl}" target="_blank" 
-                    style="background:transparent; color: var(--primary); border: 1px solid var(--primary); padding:4px 8px; border-radius:4px; cursor:pointer; font-size:11px; font-weight:bold; text-decoration:none; transition: 0.2s; white-space: nowrap;" 
-                    onmouseover="this.style.background='var(--primary)'; this.style.color='black';" 
-                    onmouseout="this.style.background='transparent'; this.style.color='var(--primary)';">
+                <a href="${qrCodeUrl}" target="_blank" class="chip-btn qr-btn">
                     QR Code Inscription
                 </a>
-                <button onclick="deleteMerchant('${m.id}')" 
-                    style="background:transparent; color: #ff4444; border: 1px solid #ff4444; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:11px; font-weight:bold; transition: 0.2s; white-space: nowrap; width: max-content;" 
-                    onmouseover="this.style.background='#ff4444'; this.style.color='white';" 
-                    onmouseout="this.style.background='transparent'; this.style.color='#ff4444';">
+                <button onclick="deleteMerchant('${m.id}')" class="chip-btn danger-btn">
                     Supprimer
                 </button>
             </div>
@@ -200,7 +191,7 @@ function buildMerchantCardHTML(m, customersCount, rowsHTML, logsRowsHTML) {
             <!-- Onglet Offre : mécanique de fidélité -->
             <div id="otab-offre_${m.id}" class="offer-pane" style="display:flex;">
                 <div style="flex:1; min-width:160px;">
-                    <label style="font-size:12px; color:gray;">Type de carte</label>
+                    <label class="field-label">Type de carte</label>
                     <select id="ltype_${m.id}" onchange="updateOfferFields('${m.id}')" style="width:100%; padding:10px; height:42px;">
                         <option value="points"${sel('points')}>Points à seuil</option>
                         <option value="stamps"${sel('stamps')}>Carte à tampons</option>
@@ -212,25 +203,25 @@ function buildMerchantCardHTML(m, customersCount, rowsHTML, logsRowsHTML) {
 
                 <div id="field-threshold_${m.id}" style="display:${showThresh}; flex:3 1 260px; flex-wrap:wrap; gap:10px;">
                     <div style="flex:1; min-width:100px;">
-                        <label id="thresh-label_${m.id}" style="font-size:12px; color:gray;">${loyaltyType === 'stamps' ? 'Nombre de tampons' : 'Seuil'}</label>
+                        <label id="thresh-label_${m.id}" class="field-label">${loyaltyType === 'stamps' ? 'Nombre de tampons' : 'Seuil'}</label>
                         <input type="number" id="thresh_${m.id}" value="${escapeHtml(m.reward_threshold)}" min="1">
                     </div>
                     <div style="flex:2; min-width:150px;">
-                        <label style="font-size:12px; color:gray;">Récompense</label>
+                        <label class="field-label">Récompense</label>
                         <input type="text" id="desc_${m.id}" value="${rewardDesc}">
                     </div>
                 </div>
 
                 <div id="field-tiers_${m.id}" style="display:${showTiers}; flex:3 1 240px;">
                     <div style="flex:1; width:100%;">
-                        <label style="font-size:12px; color:gray;">Paliers — 1 par ligne : <code>seuil = récompense</code></label>
+                        <label class="field-label">Paliers — 1 par ligne : <code>seuil = récompense</code></label>
                         <textarea id="tiers_${m.id}" rows="3" placeholder="5 = Café offert&#10;10 = Viennoiserie&#10;20 = Menu complet" style="width:100%; padding:10px; box-sizing:border-box; font-size:14px;">${tiersText}</textarea>
                     </div>
                 </div>
 
                 <div id="field-cashback_${m.id}" style="display:${showCashback}; flex:1 1 160px;">
                     <div style="flex:1; width:100%;">
-                        <label style="font-size:12px; color:gray;">Taux cashback (%)</label>
+                        <label class="field-label">Taux cashback (%)</label>
                         <input type="number" id="cashback_${m.id}" value="${cashbackRate}" min="0" max="100" step="0.5">
                     </div>
                 </div>
@@ -239,23 +230,23 @@ function buildMerchantCardHTML(m, customersCount, rowsHTML, logsRowsHTML) {
             <!-- Onglet Design : apparence de la carte -->
             <div id="otab-design_${m.id}" class="offer-pane" style="display:none;">
                 <div style="flex:1; min-width:100px;">
-                    <label style="font-size:12px; color:gray;">Couleur (Hex)</label>
+                    <label class="field-label">Couleur (Hex)</label>
                     <input type="color" id="color_${m.id}" value="${colorHex}" style="height:44px; padding:2px;">
                 </div>
                 <div style="flex:2; min-width:200px;">
-                    <label style="font-size:12px; color:gray;">Nom du programme</label>
+                    <label class="field-label">Nom du programme</label>
                     <input type="text" id="program_${m.id}" value="${programName}" placeholder="${name}" maxlength="100">
                 </div>
                 <div style="flex:1; min-width:120px;">
-                    <label style="font-size:12px; color:gray;">Libellé des points</label>
+                    <label class="field-label">Libellé des points</label>
                     <input type="text" id="plabel_${m.id}" value="${pointsLabel}" placeholder="Points" maxlength="30">
                 </div>
                 <div style="flex:2; min-width:200px;">
-                    <label style="font-size:12px; color:gray;">Lien Logo (URL)</label>
+                    <label class="field-label">Lien Logo (URL)</label>
                     <input type="url" id="logo_${m.id}" value="${logoUrl}" placeholder="https://...">
                 </div>
                 <div style="flex:2; min-width:200px;">
-                    <label style="font-size:12px; color:gray;">Lien Couverture (URL)</label>
+                    <label class="field-label">Lien Couverture (URL)</label>
                     <input type="url" id="hero_${m.id}" value="${heroUrl}" placeholder="https://...">
                 </div>
             </div>
@@ -263,11 +254,11 @@ function buildMerchantCardHTML(m, customersCount, rowsHTML, logsRowsHTML) {
             <!-- Onglet Contact : liens sur la carte -->
             <div id="otab-contact_${m.id}" class="offer-pane" style="display:none;">
                 <div style="flex:1; min-width:140px;">
-                    <label style="font-size:12px; color:gray;">Téléphone</label>
+                    <label class="field-label">Téléphone</label>
                     <input type="tel" id="phone_${m.id}" value="${phone}" placeholder="06 12 34 56 78" maxlength="30">
                 </div>
                 <div style="flex:2; min-width:200px;">
-                    <label style="font-size:12px; color:gray;">Site web (URL)</label>
+                    <label class="field-label">Site web (URL)</label>
                     <input type="text" id="website_${m.id}" value="${website}" placeholder="https://..." maxlength="300">
                 </div>
             </div>
