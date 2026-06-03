@@ -80,7 +80,7 @@ async function fetchAgencyData() {
             const card = document.createElement('div');
             card.className = 'merchant-card';
 
-            const rows = buildCustomersTableRows(m.id, customers);
+            const rows = buildCustomersTableRows(m.id, customers, m.loyalty_type);
             const logsRows = buildLogsTableRows(logs);
 
             card.innerHTML = buildMerchantCardHTML(m, customers.length, rows, logsRows);
@@ -96,18 +96,22 @@ async function fetchAgencyData() {
 // HTML Templates
 // ==========================================
 
-function buildCustomersTableRows(merchantId, customers) {
+function buildCustomersTableRows(merchantId, customers, loyaltyType) {
     if (customers.length === 0) {
         return '<tr><td colspan="4" style="text-align:center; color:gray;">Aucun client</td></tr>';
     }
-    
+
     return customers.map(c => {
         const rawName = c.customers ? `${c.customers.first_name || ''} ${c.customers.last_name || ''}`.trim() : '';
         const name = escapeHtml(rawName || 'Inconnu');
+        // Cashback cards track a euro balance; the others track points.
+        const value = loyaltyType === 'cashback'
+            ? `${((c.balance_cents || 0) / 100).toFixed(2).replace('.', ',')} €`
+            : `${c.points} pts`;
         return `
             <tr>
                 <td><strong>${name}</strong></td>
-                <td><span class="badge">${c.points} pts</span></td>
+                <td><span class="badge">${value}</span></td>
                 <td style="color:gray; font-size:12px;">${new Date(c.created_at).toLocaleDateString()}</td>
                 <td>
                     <button onclick="deleteCustomer('${merchantId}', '${c.customer_id}')" class="chip-btn danger-btn">
@@ -133,6 +137,8 @@ function buildLogsTableRows(logs) {
         if (l.action_type === 'SCAN') { actionText = '+1 Point'; actionColor = 'var(--primary)'; }
         if (l.action_type === 'REWARD') { actionText = 'Récompense !'; actionColor = 'var(--success)'; }
         if (l.action_type === 'PUSH_CAMPAIGN') { actionText = 'Push Marketing'; actionColor = 'var(--accent)'; }
+        if (l.action_type === 'CASHBACK_EARN') { actionText = 'Cashback crédité'; actionColor = 'var(--success)'; }
+        if (l.action_type === 'CASHBACK_REDEEM') { actionText = 'Cagnotte utilisée'; actionColor = 'var(--text-muted)'; }
         
         return `
             <tr>
@@ -374,8 +380,10 @@ window.updateOffer = async function(e, merchantId) {
         return;
     }
 
-    const btn = e.target.querySelector('button');
-    
+    // The form also contains the tab buttons, so target the actual submit button
+    // (not the first <button>, which is the "Offre" tab).
+    const btn = e.submitter || e.target.querySelector('button[type="submit"]');
+
     btn.innerText = "Sauvegarde...";
     try {
         const res = await adminFetch(`${API_BASE_URL}/dashboard/admin/update_offer`, {

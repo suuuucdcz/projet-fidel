@@ -36,7 +36,7 @@ def get_dashboard_stats(merchant_id: str):
 @router.get("/customers/{merchant_id}")
 def get_dashboard_customers(merchant_id: str):
     if not supabase: return []
-    res = supabase.table("loyalty_cards").select("customer_id, points, created_at, customers(first_name, last_name)").eq("merchant_id", merchant_id).order("created_at", desc=True).execute()
+    res = supabase.table("loyalty_cards").select("customer_id, points, balance_cents, created_at, customers(first_name, last_name)").eq("merchant_id", merchant_id).order("created_at", desc=True).execute()
     return res.data
 
 @router.get("/admin/merchants", dependencies=[Depends(require_admin)])
