@@ -78,11 +78,15 @@ def generate_card(merchant_id: str, req: GenerateCardRequest):
     # Generate Wallet Link with merchant rules
     link = wallet_service.generate_jwt_url(
         customer_id=customer_id, 
+        merchant_id=merchant_id,
         points=points, 
         merchant_name=merchant["name"],
         threshold=merchant["reward_threshold"],
         reward_desc=merchant["reward_description"],
-        first_name=req.first_name
+        first_name=req.first_name,
+        color_hex=merchant.get("color_hex", "#FF9800"),
+        logo_url=merchant.get("logo_url", ""),
+        hero_url=merchant.get("hero_url", "")
     )
     
     return {"wallet_link": link, "customer_id": customer_id}

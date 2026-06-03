@@ -35,7 +35,10 @@ def update_merchant_offer(req: UpdateOfferRequest):
     if not supabase: raise HTTPException(status_code=500)
     supabase.table("merchants").update({
         "reward_threshold": req.reward_threshold,
-        "reward_description": req.reward_description
+        "reward_description": req.reward_description,
+        "color_hex": req.color_hex,
+        "logo_url": req.logo_url,
+        "hero_url": req.hero_url
     }).eq("id", req.merchant_id).execute()
     return {"status": "success"}
 

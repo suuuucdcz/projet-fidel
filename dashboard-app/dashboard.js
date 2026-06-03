@@ -120,17 +120,29 @@ function buildMerchantCardHTML(m, customersCount, rowsHTML, logsRowsHTML) {
             </div>
         </div>
         
-        <form class="offer-form" onsubmit="updateOffer(event, '${m.id}')">
-            <div style="flex:1;">
+        <form class="offer-form" onsubmit="updateOffer(event, '${m.id}')" style="flex-wrap: wrap;">
+            <div style="flex:1; min-width:120px;">
                 <label style="font-size:12px; color:gray;">Seuil (Points)</label>
                 <input type="number" id="thresh_${m.id}" value="${m.reward_threshold}" required>
             </div>
-            <div style="flex:2;">
+            <div style="flex:2; min-width:200px;">
                 <label style="font-size:12px; color:gray;">Récompense</label>
                 <input type="text" id="desc_${m.id}" value="${m.reward_description}" required>
             </div>
-            <div style="display:flex; align-items:flex-end;">
-                <button type="submit" class="btn-accent">Sauvegarder l'offre</button>
+            <div style="flex:1; min-width:100px;">
+                <label style="font-size:12px; color:gray;">Couleur (Hex)</label>
+                <input type="color" id="color_${m.id}" value="${m.color_hex || '#FF9800'}" style="height:44px; padding:2px;">
+            </div>
+            <div style="flex:2; min-width:200px;">
+                <label style="font-size:12px; color:gray;">Lien Logo (URL)</label>
+                <input type="url" id="logo_${m.id}" value="${m.logo_url || ''}" placeholder="https://...">
+            </div>
+            <div style="flex:2; min-width:200px;">
+                <label style="font-size:12px; color:gray;">Lien Couverture (URL)</label>
+                <input type="url" id="hero_${m.id}" value="${m.hero_url || ''}" placeholder="https://...">
+            </div>
+            <div style="display:flex; align-items:flex-end; width:100%; margin-top:10px;">
+                <button type="submit" class="btn-accent">Sauvegarder les paramètres</button>
             </div>
         </form>
 
@@ -166,6 +178,9 @@ window.updateOffer = async function(e, merchantId) {
     e.preventDefault();
     const threshold = document.getElementById(`thresh_${merchantId}`).value;
     const desc = document.getElementById(`desc_${merchantId}`).value;
+    const color = document.getElementById(`color_${merchantId}`).value;
+    const logo = document.getElementById(`logo_${merchantId}`).value;
+    const hero = document.getElementById(`hero_${merchantId}`).value;
     const btn = e.target.querySelector('button');
     
     btn.innerText = "Sauvegarde...";
@@ -176,19 +191,22 @@ window.updateOffer = async function(e, merchantId) {
             body: JSON.stringify({
                 merchant_id: merchantId,
                 reward_threshold: parseInt(threshold),
-                reward_description: desc
+                reward_description: desc,
+                color_hex: color,
+                logo_url: logo,
+                hero_url: hero
             })
         });
         if (!res.ok) throw new Error("Erreur");
         btn.innerText = "Sauvegardé !";
         btn.style.background = "var(--success)";
         setTimeout(() => {
-            btn.innerText = "Sauvegarder l'offre";
+            btn.innerText = "Sauvegarder les paramètres";
             btn.style.background = "";
         }, 2000);
     } catch (err) {
         alert("Erreur lors de la mise à jour");
-        btn.innerText = "Sauvegarder l'offre";
+        btn.innerText = "Sauvegarder les paramètres";
     }
 }
 

@@ -49,7 +49,7 @@ class GoogleWalletService:
             "Content-Type": "application/json"
         }
 
-    def generate_jwt_url(self, customer_id: str, points: int, merchant_name: str, threshold: int, reward_desc: str, first_name: str) -> str:
+    def generate_jwt_url(self, customer_id: str, merchant_id: str, points: int, merchant_name: str, threshold: int, reward_desc: str, first_name: str, color_hex: str, logo_url: str, hero_url: str) -> str:
         """
         Generates a JWT link that the user clicks to add the card to Google Wallet.
         """
@@ -58,15 +58,24 @@ class GoogleWalletService:
             template = json.load(f)
 
         object_id = f"{self.issuer_id}.{customer_id}"
+        class_id = f"{self.issuer_id}.class_{merchant_id}"
         
         loyalty_object = template["loyaltyObject"]
         loyalty_class = template["loyaltyClass"]
 
         # Customize class based on merchant
+        loyalty_class["id"] = class_id
         loyalty_class["issuerName"] = merchant_name
+        if color_hex:
+            loyalty_class["hexBackgroundColor"] = color_hex
+        if logo_url:
+            loyalty_class["programLogo"]["sourceUri"]["uri"] = logo_url
+        if hero_url:
+            loyalty_class["heroImage"]["sourceUri"]["uri"] = hero_url
 
         # Customize object for customer
         loyalty_object["id"] = object_id
+        loyalty_object["classId"] = class_id
         loyalty_object["barcode"]["value"] = customer_id
         loyalty_object["loyaltyPoints"]["balance"]["int"] = points
         
