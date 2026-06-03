@@ -1,6 +1,6 @@
 // Service Worker for offline support (PWA shell caching).
 // Bump CACHE_VERSION whenever the cached assets change to force an update.
-const CACHE_VERSION = 'scanner-cache-v2';
+const CACHE_VERSION = 'scanner-cache-v3';
 
 // Only the static app shell. Note: paths are relative so this works whether the
 // app is served from the domain root or a sub-path. API calls are never cached.

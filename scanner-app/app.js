@@ -132,43 +132,86 @@ function showScanner() {
     startScanner();
 }
 
-function startScanner() {
+// Guards against overlapping start/stop transitions, which otherwise leave the
+// html5-qrcode instance in a broken state (frozen / black preview).
+let scannerBusy = false;
+
+async function startScanner() {
     readerDiv.classList.remove('hidden');
     resultCard.classList.add('hidden');
-    
+
     if (!html5QrCode) {
         html5QrCode = new Html5Qrcode("reader");
     }
 
-    if (html5QrCode.isScanning) return;
+    if (scannerBusy || html5QrCode.isScanning) return;
 
-    html5QrCode.start(
-        { facingMode: "environment" }, // Prefer back camera
-        { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
-        onScanSuccess,
-        onScanFailure
-    ).catch(err => {
+    scannerBusy = true;
+    try {
+        await html5QrCode.start(
+            { facingMode: "environment" }, // Prefer back camera
+            { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
+            onScanSuccess,
+            onScanFailure
+        );
+    } catch (err) {
         console.error("Camera start failed, trying fallback: ", err);
         // Fallback for laptops with no back camera
-        html5QrCode.start(
-            0, 
-            { fps: 10, qrbox: { width: 250, height: 250 } },
-            onScanSuccess,
-            (e) => {} // ignore fallback scan errors
-        ).catch(e => console.error("Total camera failure:", e));
-    });
-}
-
-function stopScanner() {
-    if (html5QrCode && html5QrCode.isScanning) {
-        html5QrCode.stop().then(() => {
-            html5QrCode.clear();
-        }).catch(err => console.error("Error stopping scanner:", err));
+        try {
+            await html5QrCode.start(
+                0,
+                { fps: 10, qrbox: { width: 250, height: 250 } },
+                onScanSuccess,
+                () => {} // ignore fallback scan errors
+            );
+        } catch (e) {
+            console.error("Total camera failure:", e);
+        }
+    } finally {
+        scannerBusy = false;
     }
 }
 
+async function stopScanner() {
+    if (!html5QrCode || scannerBusy || !html5QrCode.isScanning) return;
+    scannerBusy = true;
+    try {
+        await html5QrCode.stop();
+    } catch (err) {
+        console.error("Error stopping scanner:", err);
+    } finally {
+        scannerBusy = false;
+    }
+}
+
+// Recovery: when a tablet sleeps or the app is backgrounded, the OS kills the camera
+// track but html5-qrcode still reports isScanning === true, so the preview stays
+// black forever. On returning to the foreground (on the scanner screen), force a
+// clean stop + restart so the camera comes back.
+async function restartScanner() {
+    if (scannerBusy) return;
+    if (html5QrCode && html5QrCode.isScanning) {
+        scannerBusy = true;
+        try {
+            await html5QrCode.stop();
+        } catch (e) {
+            // Track may already be dead — ignore and start fresh.
+        } finally {
+            scannerBusy = false;
+        }
+    }
+    startScanner();
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    // Only act when the scanner screen is actually showing.
+    if (!scannerSection || scannerSection.classList.contains('hidden')) return;
+    restartScanner();
+});
+
 async function onScanSuccess(decodedText, decodedResult) {
-    stopScanner();
+    await stopScanner();
     readerDiv.classList.add('hidden');
     
     try {
