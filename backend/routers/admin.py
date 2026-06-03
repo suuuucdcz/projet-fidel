@@ -97,16 +97,45 @@ def get_merchant_logs(merchant_id: str):
     res = supabase.table("scan_logs").select("action_type, created_at, points_added, customers(first_name, last_name)").eq("merchant_id", merchant_id).order("created_at", desc=True).limit(50).execute()
     return res.data
 
+def _delete_orphan_customers(customer_ids):
+    """Delete the customers (among customer_ids) that no longer have ANY loyalty card.
+
+    Customers are global (shared across merchants via loyalty_cards), so we only remove
+    a customer once they're not linked to any merchant anymore.
+    """
+    if not supabase or not customer_ids:
+        return
+    remaining = supabase.table("loyalty_cards").select("customer_id").in_("customer_id", customer_ids).execute()
+    still_linked = {r["customer_id"] for r in (remaining.data or [])}
+    orphans = [cid for cid in customer_ids if cid not in still_linked]
+    if orphans:
+        supabase.table("customers").delete().in_("id", orphans).execute()
+
+
 @router.delete("/admin/merchants/{merchant_id}", dependencies=[Depends(require_admin)])
 def delete_merchant(merchant_id: str):
     if not supabase: raise HTTPException(status_code=500)
+
+    # Capture this merchant's customers before deleting (deleting the merchant cascades
+    # its loyalty_cards, so we'd lose the link otherwise).
+    cards = supabase.table("loyalty_cards").select("customer_id").eq("merchant_id", merchant_id).execute()
+    customer_ids = list({c["customer_id"] for c in (cards.data or [])})
+
+    # Deleting the merchant cascades its loyalty_cards and scan_logs.
     supabase.table("merchants").delete().eq("id", merchant_id).execute()
+
+    # Clean up customers who were only at this merchant.
+    _delete_orphan_customers(customer_ids)
     return {"status": "success"}
 
 @router.delete("/admin/customers/{merchant_id}/{customer_id}", dependencies=[Depends(require_admin)])
 def delete_customer_from_merchant(merchant_id: str, customer_id: str):
     if not supabase: raise HTTPException(status_code=500)
-    # Delete the customer entirely from the database
-    # ON DELETE CASCADE will automatically remove their loyalty_cards and scan_logs
-    supabase.table("customers").delete().eq("id", customer_id).execute()
+
+    # Remove only THIS merchant's card + history for the customer (the customer is global).
+    supabase.table("loyalty_cards").delete().eq("merchant_id", merchant_id).eq("customer_id", customer_id).execute()
+    supabase.table("scan_logs").delete().eq("merchant_id", merchant_id).eq("customer_id", customer_id).execute()
+
+    # If the customer no longer has any card anywhere, delete the global customer record.
+    _delete_orphan_customers([customer_id])
     return {"status": "success"}
