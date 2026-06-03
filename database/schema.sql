@@ -18,6 +18,11 @@ CREATE TABLE merchants (
     color_hex VARCHAR(9) DEFAULT '#FF9800',
     logo_url TEXT DEFAULT '',
     hero_url TEXT DEFAULT '',
+    -- Card customization
+    program_name VARCHAR(100) DEFAULT '',
+    points_label VARCHAR(30) DEFAULT 'Points',
+    phone VARCHAR(30) DEFAULT '',
+    website VARCHAR(300) DEFAULT '',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

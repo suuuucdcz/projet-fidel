@@ -87,7 +87,11 @@ def generate_card(merchant_id: str, req: GenerateCardRequest):
         first_name=req.first_name,
         color_hex=merchant.get("color_hex", "#FF9800"),
         logo_url=merchant.get("logo_url", ""),
-        hero_url=merchant.get("hero_url", "")
+        hero_url=merchant.get("hero_url", ""),
+        program_name=merchant.get("program_name") or merchant["name"],
+        points_label=merchant.get("points_label") or "Points",
+        phone=merchant.get("phone") or "",
+        website=merchant.get("website") or ""
     )
     
     return {"wallet_link": link, "customer_id": customer_id}

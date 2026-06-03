@@ -49,7 +49,7 @@ class GoogleWalletService:
             "Content-Type": "application/json"
         }
 
-    def generate_jwt_url(self, customer_id: str, merchant_id: str, points: int, merchant_name: str, threshold: int, reward_desc: str, first_name: str, color_hex: str, logo_url: str, hero_url: str) -> str:
+    def generate_jwt_url(self, customer_id: str, merchant_id: str, points: int, merchant_name: str, threshold: int, reward_desc: str, first_name: str, color_hex: str, logo_url: str, hero_url: str, program_name: str = "", points_label: str = "", phone: str = "", website: str = "") -> str:
         """
         Generates a JWT link that the user clicks to add the card to Google Wallet.
         """
@@ -66,6 +66,7 @@ class GoogleWalletService:
         # Customize class based on merchant
         loyalty_class["id"] = class_id
         loyalty_class["issuerName"] = merchant_name
+        loyalty_class["programName"] = program_name or merchant_name
         if color_hex:
             loyalty_class["hexBackgroundColor"] = color_hex
         if logo_url:
@@ -73,11 +74,25 @@ class GoogleWalletService:
         if hero_url:
             loyalty_class["heroImage"]["sourceUri"]["uri"] = hero_url
 
+        # Contact links shown on the card (phone / website)
+        links = []
+        if phone:
+            links.append({"uri": f"tel:{phone}", "description": "Téléphone", "id": "phone"})
+        if website:
+            uri = website if website.startswith("http") else f"https://{website}"
+            links.append({"uri": uri, "description": "Site web", "id": "website"})
+        if links:
+            loyalty_class["linksModuleData"] = {"uris": links}
+        else:
+            loyalty_class.pop("linksModuleData", None)
+
         # Customize object for customer
         loyalty_object["id"] = object_id
         loyalty_object["classId"] = class_id
         loyalty_object["barcode"]["value"] = customer_id
         loyalty_object["loyaltyPoints"]["balance"]["int"] = points
+        if points_label:
+            loyalty_object["loyaltyPoints"]["label"] = points_label
         
         # Add personalized greeting and rules
         loyalty_object["textModulesData"] = [

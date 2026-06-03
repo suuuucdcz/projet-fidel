@@ -55,6 +55,11 @@ class UpdateOfferRequest(BaseModel):
     color_hex: Optional[str] = None
     logo_url: Optional[str] = None
     hero_url: Optional[str] = None
+    # Card customization
+    program_name: Optional[str] = Field(default=None, max_length=100)
+    points_label: Optional[str] = Field(default=None, max_length=30)
+    phone: Optional[str] = Field(default=None, max_length=30)
+    website: Optional[str] = Field(default=None, max_length=300)
 
 class CreateMerchantRequest(BaseModel):
     name: str

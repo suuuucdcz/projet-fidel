@@ -13,6 +13,12 @@ ALTER TABLE merchants ADD COLUMN IF NOT EXISTS color_hex          VARCHAR(9) DEF
 ALTER TABLE merchants ADD COLUMN IF NOT EXISTS logo_url           TEXT DEFAULT '';
 ALTER TABLE merchants ADD COLUMN IF NOT EXISTS hero_url           TEXT DEFAULT '';
 
+-- Card customization
+ALTER TABLE merchants ADD COLUMN IF NOT EXISTS program_name VARCHAR(100) DEFAULT '';
+ALTER TABLE merchants ADD COLUMN IF NOT EXISTS points_label VARCHAR(30) DEFAULT 'Points';
+ALTER TABLE merchants ADD COLUMN IF NOT EXISTS phone        VARCHAR(30) DEFAULT '';
+ALTER TABLE merchants ADD COLUMN IF NOT EXISTS website      VARCHAR(300) DEFAULT '';
+
 -- Indexes for frequent lookups
 CREATE INDEX IF NOT EXISTS idx_loyalty_cards_merchant ON loyalty_cards(merchant_id);
 CREATE INDEX IF NOT EXISTS idx_scan_logs_merchant ON scan_logs(merchant_id, created_at DESC);

@@ -53,7 +53,8 @@ def update_merchant_offer(req: UpdateOfferRequest):
     never erases the design fields (color/logo/hero) it didn't send."""
     if not supabase: raise HTTPException(status_code=500)
 
-    updatable = ("reward_threshold", "reward_description", "color_hex", "logo_url", "hero_url")
+    updatable = ("reward_threshold", "reward_description", "color_hex", "logo_url", "hero_url",
+                 "program_name", "points_label", "phone", "website")
     updates = {f: getattr(req, f) for f in updatable if getattr(req, f) is not None}
     if not updates:
         raise HTTPException(status_code=400, detail="Aucun champ à mettre à jour")

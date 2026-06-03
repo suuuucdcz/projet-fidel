@@ -148,6 +148,10 @@ function buildMerchantCardHTML(m, customersCount, rowsHTML, logsRowsHTML) {
     const colorHex = escapeHtml(m.color_hex || '#FF9800');
     const logoUrl = escapeHtml(m.logo_url || '');
     const heroUrl = escapeHtml(m.hero_url || '');
+    const programName = escapeHtml(m.program_name || '');
+    const pointsLabel = escapeHtml(m.points_label || 'Points');
+    const phone = escapeHtml(m.phone || '');
+    const website = escapeHtml(m.website || '');
 
     return `
         <div class="merchant-header">
@@ -192,6 +196,22 @@ function buildMerchantCardHTML(m, customersCount, rowsHTML, logsRowsHTML) {
                 <label style="font-size:12px; color:gray;">Lien Couverture (URL)</label>
                 <input type="url" id="hero_${m.id}" value="${heroUrl}" placeholder="https://...">
             </div>
+            <div style="flex:2; min-width:200px;">
+                <label style="font-size:12px; color:gray;">Nom du programme</label>
+                <input type="text" id="program_${m.id}" value="${programName}" placeholder="${name}" maxlength="100">
+            </div>
+            <div style="flex:1; min-width:120px;">
+                <label style="font-size:12px; color:gray;">Libellé des points</label>
+                <input type="text" id="plabel_${m.id}" value="${pointsLabel}" placeholder="Points" maxlength="30">
+            </div>
+            <div style="flex:1; min-width:140px;">
+                <label style="font-size:12px; color:gray;">Téléphone</label>
+                <input type="tel" id="phone_${m.id}" value="${phone}" placeholder="06 12 34 56 78" maxlength="30">
+            </div>
+            <div style="flex:2; min-width:200px;">
+                <label style="font-size:12px; color:gray;">Site web (URL)</label>
+                <input type="text" id="website_${m.id}" value="${website}" placeholder="https://..." maxlength="300">
+            </div>
             <div style="display:flex; align-items:flex-end; width:100%; margin-top:10px;">
                 <button type="submit" class="btn-accent">Sauvegarder les paramètres</button>
             </div>
@@ -232,6 +252,10 @@ window.updateOffer = async function(e, merchantId) {
     const color = document.getElementById(`color_${merchantId}`).value;
     const logo = document.getElementById(`logo_${merchantId}`).value;
     const hero = document.getElementById(`hero_${merchantId}`).value;
+    const programName = document.getElementById(`program_${merchantId}`).value;
+    const pointsLabel = document.getElementById(`plabel_${merchantId}`).value;
+    const phone = document.getElementById(`phone_${merchantId}`).value;
+    const website = document.getElementById(`website_${merchantId}`).value;
     const btn = e.target.querySelector('button');
     
     btn.innerText = "Sauvegarde...";
@@ -245,7 +269,11 @@ window.updateOffer = async function(e, merchantId) {
                 reward_description: desc,
                 color_hex: color,
                 logo_url: logo,
-                hero_url: hero
+                hero_url: hero,
+                program_name: programName,
+                points_label: pointsLabel,
+                phone: phone,
+                website: website
             })
         });
         if (!res.ok) throw new Error("Erreur");
