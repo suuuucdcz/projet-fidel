@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from schemas import GenerateCardRequest, ScanRequest
 from db import supabase
 from auth import get_current_merchant_id
+from loyalty import compute_scan_result, next_objective
 from wallet_service import wallet_service
 
 router = APIRouter(prefix="/cards", tags=["cards"])
@@ -76,14 +77,21 @@ def generate_card(merchant_id: str, req: GenerateCardRequest):
         }).execute()
         points = 0
 
+    # Show the next goal on the card (handles tier milestones; identical to the simple
+    # threshold for points/stamps).
+    lt = merchant.get("loyalty_type") or "points"
+    obj_threshold, obj_reward = next_objective(
+        lt, points, merchant["reward_threshold"], merchant["reward_description"], merchant.get("tiers") or []
+    )
+
     # Generate Wallet Link with merchant rules
     link = wallet_service.generate_jwt_url(
-        customer_id=customer_id, 
+        customer_id=customer_id,
         merchant_id=merchant_id,
-        points=points, 
+        points=points,
         merchant_name=merchant["name"],
-        threshold=merchant["reward_threshold"],
-        reward_desc=merchant["reward_description"],
+        threshold=obj_threshold,
+        reward_desc=obj_reward,
         first_name=req.first_name,
         color_hex=merchant.get("color_hex", "#FF9800"),
         logo_url=merchant.get("logo_url", ""),
@@ -110,32 +118,38 @@ def scan_card(req: ScanRequest, merchant_id: str = Depends(get_current_merchant_
     merchant = m_res.data[0]
     threshold = merchant["reward_threshold"]
     reward_desc = merchant["reward_description"]
+    loyalty_type = merchant.get("loyalty_type") or "points"
+    tiers = merchant.get("tiers") or []
 
-    # Preferred path: atomic increment via the Postgres function (no read-modify-write
-    # race). Falls back to the non-atomic path if the migration hasn't been applied yet.
     new_points = None
     reward_triggered = False
-    try:
-        rpc_res = supabase.rpc("increment_loyalty_points", {
-            "p_merchant_id": merchant_id,
-            "p_customer_id": req.customer_id,
-        }).execute()
-        if rpc_res.data:
-            row = rpc_res.data[0]
-            new_points = row["new_points"]
-            reward_triggered = row["reward_triggered"]
-    except Exception as e:
-        print(f"increment_loyalty_points RPC unavailable, using fallback: {e}")
+    reward_unlocked_desc = None  # the reward that was just unlocked (for the message)
 
+    # Fast atomic path for the single-threshold models (points / stamps).
+    if loyalty_type in ("points", "stamps"):
+        try:
+            rpc_res = supabase.rpc("increment_loyalty_points", {
+                "p_merchant_id": merchant_id,
+                "p_customer_id": req.customer_id,
+            }).execute()
+            if rpc_res.data:
+                row = rpc_res.data[0]
+                new_points = row["new_points"]
+                reward_triggered = row["reward_triggered"]
+                if reward_triggered:
+                    reward_unlocked_desc = reward_desc
+        except Exception as e:
+            print(f"increment_loyalty_points RPC unavailable, using fallback: {e}")
+
+    # Tiers, or fallback when the RPC isn't available: read-modify-write in Python.
     if new_points is None:
-        # Fallback (non-atomic) — used only until the SQL migration is applied.
         card_res = supabase.table("loyalty_cards").select("points").eq("merchant_id", merchant_id).eq("customer_id", req.customer_id).execute()
         if not card_res.data:
             raise HTTPException(status_code=404, detail="Loyalty card not found")
-        new_points = card_res.data[0]["points"] + 1
-        if new_points >= threshold:
-            reward_triggered = True
-            new_points = 0
+        current = card_res.data[0]["points"]
+        new_points, reward_triggered, reward_unlocked_desc = compute_scan_result(
+            loyalty_type, current, threshold, reward_desc, tiers
+        )
         supabase.table("loyalty_cards").update({"points": new_points}).eq("merchant_id", merchant_id).eq("customer_id", req.customer_id).execute()
 
     # Log the scan
@@ -145,11 +159,13 @@ def scan_card(req: ScanRequest, merchant_id: str = Depends(get_current_merchant_
         "action_type": "REWARD" if reward_triggered else "SCAN",
         "points_added": 1
     }).execute()
-    
-    # Push update to Google Wallet
+
+    # Push the update to Google Wallet, showing the *next* goal (handles tier milestones).
+    next_threshold, next_reward = next_objective(loyalty_type, new_points, threshold, reward_desc, tiers)
+    wallet_desc = reward_unlocked_desc if reward_triggered else next_reward
     try:
-        wallet_service.update_points(req.customer_id, new_points, threshold, reward_desc, reward_unlocked=reward_triggered)
+        wallet_service.update_points(req.customer_id, new_points, next_threshold, wallet_desc, reward_unlocked=reward_triggered)
     except Exception as e:
         print(f"Warning: Failed to push update to wallet: {e}")
-        
-    return {"status": "success", "new_points": new_points, "reward_triggered": reward_triggered, "reward_desc": reward_desc if reward_triggered else None}
+
+    return {"status": "success", "new_points": new_points, "reward_triggered": reward_triggered, "reward_desc": reward_unlocked_desc if reward_triggered else None}

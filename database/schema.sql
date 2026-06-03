@@ -23,6 +23,9 @@ CREATE TABLE merchants (
     points_label VARCHAR(30) DEFAULT 'Points',
     phone VARCHAR(30) DEFAULT '',
     website VARCHAR(300) DEFAULT '',
+    -- Loyalty model: 'points', 'stamps' or 'tiers'. `tiers` holds [{threshold, reward}, ...].
+    loyalty_type VARCHAR(20) DEFAULT 'points',
+    tiers JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

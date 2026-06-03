@@ -19,6 +19,10 @@ ALTER TABLE merchants ADD COLUMN IF NOT EXISTS points_label VARCHAR(30) DEFAULT 
 ALTER TABLE merchants ADD COLUMN IF NOT EXISTS phone        VARCHAR(30) DEFAULT '';
 ALTER TABLE merchants ADD COLUMN IF NOT EXISTS website      VARCHAR(300) DEFAULT '';
 
+-- Loyalty model
+ALTER TABLE merchants ADD COLUMN IF NOT EXISTS loyalty_type VARCHAR(20) DEFAULT 'points';
+ALTER TABLE merchants ADD COLUMN IF NOT EXISTS tiers        JSONB DEFAULT '[]'::jsonb;
+
 -- Indexes for frequent lookups
 CREATE INDEX IF NOT EXISTS idx_loyalty_cards_merchant ON loyalty_cards(merchant_id);
 CREATE INDEX IF NOT EXISTS idx_scan_logs_merchant ON scan_logs(merchant_id, created_at DESC);

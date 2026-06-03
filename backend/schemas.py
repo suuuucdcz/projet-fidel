@@ -46,6 +46,11 @@ class MerchantSettingsUpdate(BaseModel):
     reward_threshold: int = Field(ge=1, le=1000)
     reward_description: str = Field(min_length=1, max_length=255)
 
+class TierItem(BaseModel):
+    threshold: int = Field(ge=1, le=10000)
+    reward: str = Field(min_length=1, max_length=255)
+
+
 class UpdateOfferRequest(BaseModel):
     merchant_id: str
     # All optional: a client that only edits the offer (e.g. the scanner app) must
@@ -60,6 +65,16 @@ class UpdateOfferRequest(BaseModel):
     points_label: Optional[str] = Field(default=None, max_length=30)
     phone: Optional[str] = Field(default=None, max_length=30)
     website: Optional[str] = Field(default=None, max_length=300)
+    # Loyalty model: "points", "stamps", or "tiers"
+    loyalty_type: Optional[str] = None
+    tiers: Optional[list[TierItem]] = None
+
+    @field_validator("loyalty_type")
+    @classmethod
+    def _validate_loyalty_type(cls, v):
+        if v is not None and v not in ("points", "stamps", "tiers"):
+            raise ValueError("loyalty_type must be 'points', 'stamps' or 'tiers'")
+        return v
 
 class CreateMerchantRequest(BaseModel):
     name: str

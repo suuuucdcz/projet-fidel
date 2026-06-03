@@ -152,6 +152,9 @@ function buildMerchantCardHTML(m, customersCount, rowsHTML, logsRowsHTML) {
     const pointsLabel = escapeHtml(m.points_label || 'Points');
     const phone = escapeHtml(m.phone || '');
     const website = escapeHtml(m.website || '');
+    const loyaltyType = (m.loyalty_type === 'stamps' || m.loyalty_type === 'tiers') ? m.loyalty_type : 'points';
+    const tiersText = escapeHtml((m.tiers || []).map(t => `${t.threshold} = ${t.reward}`).join('\n'));
+    const sel = (v) => loyaltyType === v ? ' selected' : '';
 
     return `
         <div class="merchant-header">
@@ -212,6 +215,18 @@ function buildMerchantCardHTML(m, customersCount, rowsHTML, logsRowsHTML) {
                 <label style="font-size:12px; color:gray;">Site web (URL)</label>
                 <input type="text" id="website_${m.id}" value="${website}" placeholder="https://..." maxlength="300">
             </div>
+            <div style="flex:1; min-width:160px;">
+                <label style="font-size:12px; color:gray;">Type de carte</label>
+                <select id="ltype_${m.id}" style="width:100%; padding:10px; height:42px;">
+                    <option value="points"${sel('points')}>Points à seuil</option>
+                    <option value="stamps"${sel('stamps')}>Carte à tampons</option>
+                    <option value="tiers"${sel('tiers')}>Paliers</option>
+                </select>
+            </div>
+            <div style="flex:2; min-width:240px;">
+                <label style="font-size:12px; color:gray;">Paliers — 1 par ligne : <code>seuil = récompense</code> (si type « Paliers »)</label>
+                <textarea id="tiers_${m.id}" rows="3" placeholder="5 = Café offert&#10;10 = Viennoiserie&#10;20 = Menu complet" style="width:100%; padding:10px; box-sizing:border-box; font-size:14px;">${tiersText}</textarea>
+            </div>
             <div style="display:flex; align-items:flex-end; width:100%; margin-top:10px;">
                 <button type="submit" class="btn-accent">Sauvegarder les paramètres</button>
             </div>
@@ -256,6 +271,26 @@ window.updateOffer = async function(e, merchantId) {
     const pointsLabel = document.getElementById(`plabel_${merchantId}`).value;
     const phone = document.getElementById(`phone_${merchantId}`).value;
     const website = document.getElementById(`website_${merchantId}`).value;
+    const loyaltyType = document.getElementById(`ltype_${merchantId}`).value;
+
+    // Parse the tiers editor: one line "threshold = reward".
+    const tiers = document.getElementById(`tiers_${merchantId}`).value
+        .split('\n')
+        .map(line => {
+            const idx = line.indexOf('=');
+            if (idx === -1) return null;
+            const threshold = parseInt(line.slice(0, idx).trim(), 10);
+            const reward = line.slice(idx + 1).trim();
+            return (threshold > 0 && reward) ? { threshold, reward } : null;
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.threshold - b.threshold);
+
+    if (loyaltyType === 'tiers' && tiers.length === 0) {
+        alert("Type « Paliers » sélectionné mais aucun palier valide. Format attendu : « 5 = Café offert » (un par ligne).");
+        return;
+    }
+
     const btn = e.target.querySelector('button');
     
     btn.innerText = "Sauvegarde...";
@@ -273,7 +308,9 @@ window.updateOffer = async function(e, merchantId) {
                 program_name: programName,
                 points_label: pointsLabel,
                 phone: phone,
-                website: website
+                website: website,
+                loyalty_type: loyaltyType,
+                tiers: tiers
             })
         });
         if (!res.ok) throw new Error("Erreur");

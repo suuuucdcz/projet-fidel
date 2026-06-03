@@ -54,8 +54,16 @@ def update_merchant_offer(req: UpdateOfferRequest):
     if not supabase: raise HTTPException(status_code=500)
 
     updatable = ("reward_threshold", "reward_description", "color_hex", "logo_url", "hero_url",
-                 "program_name", "points_label", "phone", "website")
-    updates = {f: getattr(req, f) for f in updatable if getattr(req, f) is not None}
+                 "program_name", "points_label", "phone", "website", "loyalty_type", "tiers")
+    updates = {}
+    for f in updatable:
+        val = getattr(req, f)
+        if val is None:
+            continue
+        if f == "tiers":
+            # Pydantic models -> plain dicts for the JSONB column.
+            val = [t.model_dump() for t in val]
+        updates[f] = val
     if not updates:
         raise HTTPException(status_code=400, detail="Aucun champ à mettre à jour")
 
