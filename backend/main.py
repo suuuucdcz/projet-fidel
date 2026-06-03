@@ -20,9 +20,15 @@ _default_origins = [
 _env_origins = os.environ.get("ALLOWED_ORIGINS", "")
 allowed_origins = [o.strip() for o in _env_origins.split(",") if o.strip()] or _default_origins
 
+# Also allow any *.vercel.app deployment by default, so the dashboard/scanner/signup
+# previews keep working without listing every sub-domain. Override by setting
+# ALLOWED_ORIGIN_REGEX (empty string disables the regex entirely).
+allow_origin_regex = os.environ.get("ALLOWED_ORIGIN_REGEX", r"https://.*\.vercel\.app")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
+    allow_origin_regex=allow_origin_regex or None,
     allow_credentials=False,
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["*"],
