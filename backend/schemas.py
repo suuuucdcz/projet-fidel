@@ -65,15 +65,29 @@ class UpdateOfferRequest(BaseModel):
     points_label: Optional[str] = Field(default=None, max_length=30)
     phone: Optional[str] = Field(default=None, max_length=30)
     website: Optional[str] = Field(default=None, max_length=300)
-    # Loyalty model: "points", "stamps", or "tiers"
+    # Loyalty model: "points", "stamps", "tiers" or "cashback"
     loyalty_type: Optional[str] = None
     tiers: Optional[list[TierItem]] = None
+    cashback_rate: Optional[float] = Field(default=None, ge=0, le=100)
 
     @field_validator("loyalty_type")
     @classmethod
     def _validate_loyalty_type(cls, v):
-        if v is not None and v not in ("points", "stamps", "tiers"):
-            raise ValueError("loyalty_type must be 'points', 'stamps' or 'tiers'")
+        if v is not None and v not in ("points", "stamps", "tiers", "cashback"):
+            raise ValueError("loyalty_type must be 'points', 'stamps', 'tiers' or 'cashback'")
+        return v
+
+
+class CashbackRequest(BaseModel):
+    customer_id: str
+    amount: float = Field(gt=0, le=100000)
+    operation: str  # "earn" or "redeem"
+
+    @field_validator("operation")
+    @classmethod
+    def _validate_operation(cls, v):
+        if v not in ("earn", "redeem"):
+            raise ValueError("operation must be 'earn' or 'redeem'")
         return v
 
 class CreateMerchantRequest(BaseModel):

@@ -65,6 +65,20 @@
                 <p id="points-status">Nouveau solde: X points</p>
                 <button id="next-scan-btn" class="btn-secondary">Scanner le suivant</button>
             </div>
+
+            <!-- Cashback panel (shown instead of the point result for cashback merchants) -->
+            <div id="cashback-panel" class="result-card hidden">
+                <h3>Cashback</h3>
+                <p id="cashback-balance">Cagnotte : …</p>
+                <div class="input-group">
+                    <label for="cashback-amount">Montant (€)</label>
+                    <input type="number" id="cashback-amount" inputmode="decimal" step="0.01" min="0" placeholder="Ex : 12.50">
+                </div>
+                <button id="cashback-earn-btn" class="btn-primary">Encaisser l'achat (créditer)</button>
+                <button id="cashback-redeem-btn" class="btn-secondary">Utiliser la cagnotte</button>
+                <p id="cashback-msg" style="margin-top:10px; font-weight:bold;"></p>
+                <button id="cashback-next-btn" class="btn-text">Client suivant</button>
+            </div>
         </section>
         
         <!-- Push Marketing Section -->

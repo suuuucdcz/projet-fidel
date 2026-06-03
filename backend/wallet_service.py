@@ -49,7 +49,11 @@ class GoogleWalletService:
             "Content-Type": "application/json"
         }
 
-    def generate_jwt_url(self, customer_id: str, merchant_id: str, points: int, merchant_name: str, threshold: int, reward_desc: str, first_name: str, color_hex: str, logo_url: str, hero_url: str, program_name: str = "", points_label: str = "", phone: str = "", website: str = "") -> str:
+    @staticmethod
+    def _format_eur(value) -> str:
+        return f"{float(value or 0):.2f} €".replace(".", ",")
+
+    def generate_jwt_url(self, customer_id: str, merchant_id: str, points: int, merchant_name: str, threshold: int, reward_desc: str, first_name: str, color_hex: str, logo_url: str, hero_url: str, program_name: str = "", points_label: str = "", phone: str = "", website: str = "", loyalty_type: str = "points", balance: float = 0.0) -> str:
         """
         Generates a JWT link that the user clicks to add the card to Google Wallet.
         """
@@ -90,17 +94,29 @@ class GoogleWalletService:
         loyalty_object["id"] = object_id
         loyalty_object["classId"] = class_id
         loyalty_object["barcode"]["value"] = customer_id
-        loyalty_object["loyaltyPoints"]["balance"]["int"] = points
-        if points_label:
-            loyalty_object["loyaltyPoints"]["label"] = points_label
-        
-        # Add personalized greeting and rules
-        loyalty_object["textModulesData"] = [
-            {
+
+        if loyalty_type == "cashback":
+            # Show a euro balance ("cagnotte") instead of integer points.
+            loyalty_object["loyaltyPoints"]["label"] = points_label or "Cagnotte"
+            loyalty_object["loyaltyPoints"]["balance"] = {"string": self._format_eur(balance)}
+            objective = {
+                "id": "points_info",
+                "header": "Votre cagnotte fidélité",
+                "body": f"{self._format_eur(balance)} à utiliser lors de vos prochains achats."
+            }
+        else:
+            loyalty_object["loyaltyPoints"]["balance"] = {"int": points}
+            if points_label:
+                loyalty_object["loyaltyPoints"]["label"] = points_label
+            objective = {
                 "id": "points_info",
                 "header": f"Objectif: {reward_desc}",
                 "body": f"Plus que {max(threshold - points, 0)} points avant votre récompense !"
-            },
+            }
+
+        # Add personalized greeting and rules
+        loyalty_object["textModulesData"] = [
+            objective,
             {
                 "id": "customer_greeting",
                 "header": "Titulaire de la carte",
@@ -171,6 +187,42 @@ class GoogleWalletService:
         response = requests.patch(url_with_notify, headers=headers, json=patch_body)
         if response.status_code != 200:
             print(f"Failed to update Wallet Object: {response.text}")
+        return response.json() if response.status_code == 200 else None
+
+    def update_cashback(self, customer_id: str, new_balance: float, points_label: str = "", earned: float = None, redeemed: float = None):
+        """Update a cashback card's euro balance and notify the customer."""
+        object_id = f"{self.issuer_id}.{customer_id}"
+        url = f"{self.base_url}/loyaltyObject/{object_id}"
+        balance_str = self._format_eur(new_balance)
+
+        if earned is not None:
+            header = "💰 Cashback crédité !"
+            msg_body = f"+{self._format_eur(earned)} sur votre cagnotte. Solde : {balance_str}."
+        else:
+            header = "🛍️ Cagnotte utilisée"
+            msg_body = f"-{self._format_eur(redeemed)} utilisés. Solde restant : {balance_str}."
+
+        patch_body = {
+            "loyaltyPoints": {
+                "label": points_label or "Cagnotte",
+                "balance": {"string": balance_str}
+            },
+            "textModulesData": [{
+                "id": "points_info",
+                "header": "Votre cagnotte fidélité",
+                "body": f"{balance_str} à utiliser lors de vos prochains achats."
+            }],
+            "messages": [{
+                "header": header,
+                "body": msg_body,
+                "id": str(uuid.uuid4()),
+                "messageType": "TEXT_AND_NOTIFY"
+            }]
+        }
+        headers = self._get_auth_headers()
+        response = requests.patch(f"{url}?notifyOnUpdate=true", headers=headers, json=patch_body)
+        if response.status_code != 200:
+            print(f"Failed to update cashback: {response.text}")
         return response.json() if response.status_code == 200 else None
 
     def push_marketing_message(self, customer_id: str, header: str, body: str):

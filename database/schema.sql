@@ -23,9 +23,10 @@ CREATE TABLE merchants (
     points_label VARCHAR(30) DEFAULT 'Points',
     phone VARCHAR(30) DEFAULT '',
     website VARCHAR(300) DEFAULT '',
-    -- Loyalty model: 'points', 'stamps' or 'tiers'. `tiers` holds [{threshold, reward}, ...].
+    -- Loyalty model: 'points', 'stamps', 'tiers' or 'cashback'. `tiers` holds [{threshold, reward}, ...].
     loyalty_type VARCHAR(20) DEFAULT 'points',
     tiers JSONB DEFAULT '[]'::jsonb,
+    cashback_rate NUMERIC(5,2) DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -44,6 +45,7 @@ CREATE TABLE loyalty_cards (
     merchant_id UUID REFERENCES merchants(id) ON DELETE CASCADE,
     customer_id UUID REFERENCES customers(id) ON DELETE CASCADE,
     points INTEGER NOT NULL DEFAULT 0,
+    balance NUMERIC(10,2) NOT NULL DEFAULT 0, -- cashback "cagnotte" in euros
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(merchant_id, customer_id)
 );

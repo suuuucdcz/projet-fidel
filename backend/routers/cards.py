@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, Depends
-from schemas import GenerateCardRequest, ScanRequest
+from schemas import GenerateCardRequest, ScanRequest, CashbackRequest
 from db import supabase
 from auth import get_current_merchant_id
-from loyalty import compute_scan_result, next_objective
+from loyalty import compute_scan_result, next_objective, compute_cashback_earn
 from wallet_service import wallet_service
 
 router = APIRouter(prefix="/cards", tags=["cards"])
@@ -84,6 +84,12 @@ def generate_card(merchant_id: str, req: GenerateCardRequest):
         lt, points, merchant["reward_threshold"], merchant["reward_description"], merchant.get("tiers") or []
     )
 
+    # For cashback cards, the card shows a euro balance rather than points.
+    balance = 0.0
+    bal_res = supabase.table("loyalty_cards").select("balance").eq("merchant_id", merchant_id).eq("customer_id", customer_id).execute()
+    if bal_res.data:
+        balance = float(bal_res.data[0].get("balance") or 0)
+
     # Generate Wallet Link with merchant rules
     link = wallet_service.generate_jwt_url(
         customer_id=customer_id,
@@ -99,7 +105,9 @@ def generate_card(merchant_id: str, req: GenerateCardRequest):
         program_name=merchant.get("program_name") or merchant["name"],
         points_label=merchant.get("points_label") or "Points",
         phone=merchant.get("phone") or "",
-        website=merchant.get("website") or ""
+        website=merchant.get("website") or "",
+        loyalty_type=lt,
+        balance=balance
     )
     
     return {"wallet_link": link, "customer_id": customer_id}
@@ -169,3 +177,62 @@ def scan_card(req: ScanRequest, merchant_id: str = Depends(get_current_merchant_
         print(f"Warning: Failed to push update to wallet: {e}")
 
     return {"status": "success", "new_points": new_points, "reward_triggered": reward_triggered, "reward_desc": reward_unlocked_desc if reward_triggered else None}
+
+
+@router.get("/info/{customer_id}")
+def card_info(customer_id: str, merchant_id: str = Depends(get_current_merchant_id)):
+    """Current points + cashback balance of a card, for the authenticated merchant."""
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+    card_res = supabase.table("loyalty_cards").select("points, balance").eq("merchant_id", merchant_id).eq("customer_id", customer_id).execute()
+    if not card_res.data:
+        raise HTTPException(status_code=404, detail="Loyalty card not found")
+    row = card_res.data[0]
+    return {"points": row.get("points", 0), "balance": float(row.get("balance") or 0)}
+
+
+@router.post("/cashback")
+def cashback(req: CashbackRequest, merchant_id: str = Depends(get_current_merchant_id)):
+    """Cashback earn/redeem. merchant_id comes from the session token."""
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    m_res = supabase.table("merchants").select("*").eq("id", merchant_id).execute()
+    if not m_res.data:
+        raise HTTPException(status_code=404, detail="Merchant not found")
+    merchant = m_res.data[0]
+    if (merchant.get("loyalty_type") or "points") != "cashback":
+        raise HTTPException(status_code=400, detail="Ce commerçant n'utilise pas le cashback")
+    rate = float(merchant.get("cashback_rate") or 0)
+
+    card_res = supabase.table("loyalty_cards").select("balance").eq("merchant_id", merchant_id).eq("customer_id", req.customer_id).execute()
+    if not card_res.data:
+        raise HTTPException(status_code=404, detail="Loyalty card not found")
+    balance = float(card_res.data[0].get("balance") or 0)
+
+    earned = redeemed = None
+    if req.operation == "earn":
+        earned = compute_cashback_earn(req.amount, rate)
+        new_balance = round(balance + earned, 2)
+    else:  # redeem
+        if req.amount > balance:
+            raise HTTPException(status_code=400, detail=f"Cagnotte insuffisante (solde : {balance:.2f} €)")
+        redeemed = round(req.amount, 2)
+        new_balance = round(balance - redeemed, 2)
+
+    supabase.table("loyalty_cards").update({"balance": new_balance}).eq("merchant_id", merchant_id).eq("customer_id", req.customer_id).execute()
+
+    supabase.table("scan_logs").insert({
+        "merchant_id": merchant_id,
+        "customer_id": req.customer_id,
+        "action_type": "CASHBACK_EARN" if req.operation == "earn" else "CASHBACK_REDEEM",
+        "points_added": 0
+    }).execute()
+
+    label = merchant.get("points_label") or "Cagnotte"
+    try:
+        wallet_service.update_cashback(req.customer_id, new_balance, label, earned=earned, redeemed=redeemed)
+    except Exception as e:
+        print(f"Warning: cashback wallet update failed: {e}")
+
+    return {"status": "success", "balance": new_balance, "earned": earned, "redeemed": redeemed}

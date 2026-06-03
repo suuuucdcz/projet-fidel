@@ -45,6 +45,11 @@ def compute_scan_result(loyalty_type, current_points, reward_threshold, reward_d
     return new_points, False, None
 
 
+def compute_cashback_earn(amount, rate):
+    """Cashback earned (euros) for a purchase `amount` at `rate` percent, rounded to cents."""
+    return round(float(amount) * float(rate) / 100.0, 2)
+
+
 def next_objective(loyalty_type, points, reward_threshold, reward_description, tiers):
     """Return (next_threshold, next_reward) describing the upcoming goal, for the
     card's "X points to go" display."""

@@ -35,7 +35,7 @@ def get_merchant_settings(merchant_id: str):
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
         
-    m_res = supabase.table("merchants").select("name, reward_threshold, reward_description, color_hex, logo_url, hero_url, program_name, points_label, phone, website, loyalty_type, tiers").eq("id", merchant_id).execute()
+    m_res = supabase.table("merchants").select("name, reward_threshold, reward_description, color_hex, logo_url, hero_url, program_name, points_label, phone, website, loyalty_type, tiers, cashback_rate").eq("id", merchant_id).execute()
     if not m_res.data:
         raise HTTPException(status_code=404, detail="Merchant not found")
 

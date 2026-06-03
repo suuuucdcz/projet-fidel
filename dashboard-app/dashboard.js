@@ -152,8 +152,9 @@ function buildMerchantCardHTML(m, customersCount, rowsHTML, logsRowsHTML) {
     const pointsLabel = escapeHtml(m.points_label || 'Points');
     const phone = escapeHtml(m.phone || '');
     const website = escapeHtml(m.website || '');
-    const loyaltyType = (m.loyalty_type === 'stamps' || m.loyalty_type === 'tiers') ? m.loyalty_type : 'points';
+    const loyaltyType = ['stamps', 'tiers', 'cashback'].includes(m.loyalty_type) ? m.loyalty_type : 'points';
     const tiersText = escapeHtml((m.tiers || []).map(t => `${t.threshold} = ${t.reward}`).join('\n'));
+    const cashbackRate = escapeHtml(m.cashback_rate != null ? m.cashback_rate : 0);
     const sel = (v) => loyaltyType === v ? ' selected' : '';
 
     return `
@@ -221,7 +222,12 @@ function buildMerchantCardHTML(m, customersCount, rowsHTML, logsRowsHTML) {
                     <option value="points"${sel('points')}>Points à seuil</option>
                     <option value="stamps"${sel('stamps')}>Carte à tampons</option>
                     <option value="tiers"${sel('tiers')}>Paliers</option>
+                    <option value="cashback"${sel('cashback')}>Cashback (%)</option>
                 </select>
+            </div>
+            <div style="flex:1; min-width:140px;">
+                <label style="font-size:12px; color:gray;">Taux cashback (%) — si type « Cashback »</label>
+                <input type="number" id="cashback_${m.id}" value="${cashbackRate}" min="0" max="100" step="0.5">
             </div>
             <div style="flex:2; min-width:240px;">
                 <label style="font-size:12px; color:gray;">Paliers — 1 par ligne : <code>seuil = récompense</code> (si type « Paliers »)</label>
@@ -291,6 +297,12 @@ window.updateOffer = async function(e, merchantId) {
         return;
     }
 
+    const cashbackRate = parseFloat(document.getElementById(`cashback_${merchantId}`).value) || 0;
+    if (loyaltyType === 'cashback' && cashbackRate <= 0) {
+        alert("Type « Cashback » sélectionné mais le taux est à 0 %. Indiquez un taux (ex : 5).");
+        return;
+    }
+
     const btn = e.target.querySelector('button');
     
     btn.innerText = "Sauvegarde...";
@@ -310,7 +322,8 @@ window.updateOffer = async function(e, merchantId) {
                 phone: phone,
                 website: website,
                 loyalty_type: loyaltyType,
-                tiers: tiers
+                tiers: tiers,
+                cashback_rate: cashbackRate
             })
         });
         if (!res.ok) throw new Error("Erreur");

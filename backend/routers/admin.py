@@ -54,7 +54,8 @@ def update_merchant_offer(req: UpdateOfferRequest):
     if not supabase: raise HTTPException(status_code=500)
 
     updatable = ("reward_threshold", "reward_description", "color_hex", "logo_url", "hero_url",
-                 "program_name", "points_label", "phone", "website", "loyalty_type", "tiers")
+                 "program_name", "points_label", "phone", "website", "loyalty_type", "tiers",
+                 "cashback_rate")
     updates = {}
     for f in updatable:
         val = getattr(req, f)

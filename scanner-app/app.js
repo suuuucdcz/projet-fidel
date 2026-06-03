@@ -2,6 +2,8 @@ const API_BASE_URL = 'https://projet-fidel.onrender.com';
 let currentMerchantId = localStorage.getItem('merchant_id');
 let sessionToken = localStorage.getItem('access_token');
 let html5QrCode = null;
+let merchantLoyaltyType = 'points';   // loaded after login; drives the scan flow
+let currentCustomerId = null;         // customer of the card currently on screen (cashback)
 
 // ==========================================
 // DOM Elements
@@ -14,6 +16,7 @@ const bottomNav = document.getElementById('bottom-nav');
 const readerDiv = document.getElementById('reader');
 const resultCard = document.getElementById('scan-result');
 const pointsStatus = document.getElementById('points-status');
+const cashbackPanel = document.getElementById('cashback-panel');
 
 // ==========================================
 // Authenticated requests (merchant session token)
@@ -129,7 +132,22 @@ function showScanner() {
     pushSection.classList.add('hidden');
     if (settingsSection) settingsSection.classList.add('hidden');
     bottomNav.classList.remove('hidden');
+    loadMerchantType();
     startScanner();
+}
+
+// Load the merchant's loyalty type so the scan flow can branch (cashback vs points).
+// Uses the public settings endpoint (no token needed) — read-only display info.
+async function loadMerchantType() {
+    try {
+        const res = await fetch(`${API_BASE_URL}/merchants/settings/${currentMerchantId}`);
+        if (res.ok) {
+            const data = await res.json();
+            merchantLoyaltyType = data.loyalty_type || 'points';
+        }
+    } catch (e) {
+        console.error('Failed to load merchant type', e);
+    }
 }
 
 // Guards against overlapping start/stop transitions, which otherwise leave the
@@ -139,6 +157,7 @@ let scannerBusy = false;
 async function startScanner() {
     readerDiv.classList.remove('hidden');
     resultCard.classList.add('hidden');
+    if (cashbackPanel) cashbackPanel.classList.add('hidden');
 
     if (!html5QrCode) {
         html5QrCode = new Html5Qrcode("reader");
@@ -213,18 +232,26 @@ document.addEventListener('visibilitychange', () => {
 async function onScanSuccess(decodedText, decodedResult) {
     await stopScanner();
     readerDiv.classList.add('hidden');
-    
+
+    if (merchantLoyaltyType === 'cashback') {
+        await showCashbackPanel(decodedText);
+    } else {
+        await doPointScan(decodedText);
+    }
+}
+
+async function doPointScan(customerId) {
     try {
         const response = await authFetch(`${API_BASE_URL}/cards/scan`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ customer_id: decodedText })
+            body: JSON.stringify({ customer_id: customerId })
         });
 
         if (!response.ok) throw new Error('Erreur lors du scan (carte introuvable ou erreur serveur)');
-        
+
         const data = await response.json();
-        
+
         if (data.reward_triggered) {
             pointsStatus.innerText = `Récompense débloquée ! (${data.reward_desc})`;
             pointsStatus.style.color = "var(--success)";
@@ -234,12 +261,82 @@ async function onScanSuccess(decodedText, decodedResult) {
             pointsStatus.style.color = "var(--text-muted)";
             pointsStatus.style.fontWeight = "normal";
         }
-        
+
         resultCard.classList.remove('hidden');
     } catch (error) {
         alert(error.message);
         startScanner();
     }
+}
+
+// ==========================================
+// Cashback flow
+// ==========================================
+const fmtEur = (v) => `${Number(v || 0).toFixed(2).replace('.', ',')} €`;
+
+async function showCashbackPanel(customerId) {
+    currentCustomerId = customerId;
+    const balanceEl = document.getElementById('cashback-balance');
+    const msgEl = document.getElementById('cashback-msg');
+    const amountEl = document.getElementById('cashback-amount');
+    if (msgEl) msgEl.innerText = '';
+    if (amountEl) amountEl.value = '';
+    if (balanceEl) balanceEl.innerText = 'Cagnotte : …';
+
+    cashbackPanel.classList.remove('hidden');
+
+    try {
+        const res = await authFetch(`${API_BASE_URL}/cards/info/${encodeURIComponent(customerId)}`);
+        if (!res.ok) throw new Error('Carte introuvable');
+        const data = await res.json();
+        if (balanceEl) balanceEl.innerText = `Cagnotte actuelle : ${fmtEur(data.balance)}`;
+    } catch (error) {
+        if (balanceEl) balanceEl.innerText = 'Cagnotte : (indisponible)';
+    }
+}
+
+async function sendCashback(operation, amount) {
+    const msgEl = document.getElementById('cashback-msg');
+    const balanceEl = document.getElementById('cashback-balance');
+    try {
+        const res = await authFetch(`${API_BASE_URL}/cards/cashback`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ customer_id: currentCustomerId, amount, operation })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Erreur cashback');
+
+        if (balanceEl) balanceEl.innerText = `Cagnotte actuelle : ${fmtEur(data.balance)}`;
+        if (msgEl) {
+            msgEl.style.color = 'var(--success)';
+            msgEl.innerText = operation === 'earn'
+                ? `+${fmtEur(data.earned)} crédités 🎉`
+                : `-${fmtEur(data.redeemed)} utilisés ✅`;
+        }
+        document.getElementById('cashback-amount').value = '';
+    } catch (error) {
+        if (msgEl) { msgEl.style.color = 'var(--danger, #ff5252)'; msgEl.innerText = error.message; }
+    }
+}
+
+if (cashbackPanel) {
+    document.getElementById('cashback-earn-btn').addEventListener('click', () => {
+        const amount = parseFloat(document.getElementById('cashback-amount').value);
+        if (!amount || amount <= 0) { alert("Saisis le montant de l'achat."); return; }
+        sendCashback('earn', amount);
+    });
+
+    document.getElementById('cashback-redeem-btn').addEventListener('click', () => {
+        const amount = parseFloat(document.getElementById('cashback-amount').value);
+        if (!amount || amount <= 0) { alert('Saisis le montant à utiliser depuis la cagnotte.'); return; }
+        sendCashback('redeem', amount);
+    });
+
+    document.getElementById('cashback-next-btn').addEventListener('click', () => {
+        cashbackPanel.classList.add('hidden');
+        startScanner();
+    });
 }
 
 function onScanFailure(error) {
