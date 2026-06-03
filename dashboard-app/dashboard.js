@@ -64,6 +64,27 @@ window.updateCardPreview = function (merchantId) {
     }
 };
 
+// Test an image URL the way Google will (it must publicly fetch the file). Shows a
+// ✓ / ⚠ status next to the field so a bad link is obvious BEFORE saving.
+window.checkImageStatus = function (merchantId, kind) {
+    const input = document.getElementById(`${kind}_${merchantId}`);
+    const status = document.getElementById(`${kind}-status_${merchantId}`);
+    if (!input || !status) return;
+    const url = input.value.trim();
+    if (!url) { status.textContent = ''; return; }
+    if (!/^https:\/\//i.test(url)) {
+        status.textContent = '⚠ doit commencer par https://';
+        status.style.color = '#ff5252';
+        return;
+    }
+    status.textContent = '⏳ vérification…';
+    status.style.color = 'var(--text-muted)';
+    const img = new Image();
+    img.onload = () => { status.textContent = '✓ image valide'; status.style.color = 'var(--success)'; };
+    img.onerror = () => { status.textContent = '⚠ lien invalide ou image inaccessible (Google ne pourra pas la charger)'; status.style.color = '#ff5252'; };
+    img.src = url;
+};
+
 // ==========================================
 // Admin authentication (minimal shared-secret guard)
 // ==========================================
@@ -125,6 +146,9 @@ async function fetchAgencyData() {
 
             card.innerHTML = buildMerchantCardHTML(m, customers.length, rows, logsRows);
             container.appendChild(card);
+            // Check existing image URLs so a broken logo/banner is flagged immediately.
+            checkImageStatus(m.id, 'logo');
+            checkImageStatus(m.id, 'hero');
         }
     } catch (e) {
         console.error(e);
@@ -290,12 +314,14 @@ function buildMerchantCardHTML(m, customersCount, rowsHTML, logsRowsHTML) {
                     <input type="text" id="plabel_${m.id}" value="${pointsLabel}" placeholder="Points" maxlength="30" oninput="updateCardPreview('${m.id}')">
                 </div>
                 <div style="flex:2; min-width:200px;">
-                    <label class="field-label">Lien Logo (URL)</label>
-                    <input type="url" id="logo_${m.id}" value="${logoUrl}" placeholder="https://..." oninput="updateCardPreview('${m.id}')">
+                    <label class="field-label">Lien Logo (URL) — carré, ~512px</label>
+                    <input type="url" id="logo_${m.id}" value="${logoUrl}" placeholder="https://…/logo.png" oninput="updateCardPreview('${m.id}'); checkImageStatus('${m.id}','logo')">
+                    <div class="img-status" id="logo-status_${m.id}"></div>
                 </div>
                 <div style="flex:2; min-width:200px;">
-                    <label class="field-label">Lien Couverture (URL)</label>
-                    <input type="url" id="hero_${m.id}" value="${heroUrl}" placeholder="https://..." oninput="updateCardPreview('${m.id}')">
+                    <label class="field-label">Lien Couverture (URL) — large, ~1032×336</label>
+                    <input type="url" id="hero_${m.id}" value="${heroUrl}" placeholder="https://…/banniere.jpg" oninput="updateCardPreview('${m.id}'); checkImageStatus('${m.id}','hero')">
+                    <div class="img-status" id="hero-status_${m.id}"></div>
                 </div>
             </div>
 
