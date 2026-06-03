@@ -92,3 +92,40 @@ BEGIN
     END IF;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Atomic tier increment: +1, reset at the top tier; returns post-reset balance and the
+-- pre-reset value reached (app derives which tier reward fired).
+CREATE OR REPLACE FUNCTION increment_tiers(p_merchant_id UUID, p_customer_id UUID, p_max_threshold INTEGER)
+RETURNS TABLE(new_points INTEGER, reached INTEGER) AS $$
+DECLARE
+    v_points INTEGER;
+BEGIN
+    UPDATE loyalty_cards SET points = points + 1
+     WHERE merchant_id = p_merchant_id AND customer_id = p_customer_id
+     RETURNING points INTO v_points;
+    IF v_points IS NULL THEN
+        RETURN;
+    END IF;
+    IF v_points >= p_max_threshold THEN
+        UPDATE loyalty_cards SET points = 0
+         WHERE merchant_id = p_merchant_id AND customer_id = p_customer_id;
+        RETURN QUERY SELECT 0, v_points;
+    ELSE
+        RETURN QUERY SELECT v_points, v_points;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Atomic cashback: add p_delta_cents (negative to redeem), never below 0.
+-- Returns the new balance; empty if card missing or balance would go negative.
+CREATE OR REPLACE FUNCTION apply_cashback(p_merchant_id UUID, p_customer_id UUID, p_delta_cents INTEGER)
+RETURNS TABLE(new_balance INTEGER) AS $$
+BEGIN
+    RETURN QUERY
+    UPDATE loyalty_cards
+       SET balance_cents = balance_cents + p_delta_cents
+     WHERE merchant_id = p_merchant_id AND customer_id = p_customer_id
+       AND balance_cents + p_delta_cents >= 0
+     RETURNING balance_cents;
+END;
+$$ LANGUAGE plpgsql;

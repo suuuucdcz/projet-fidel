@@ -1,5 +1,5 @@
 """Unit tests for the pure loyalty logic — no DB, no network."""
-from loyalty import compute_scan_result, next_objective, compute_cashback_earn_cents
+from loyalty import compute_scan_result, next_objective, compute_cashback_earn_cents, tier_reward_at
 
 TIERS = [{"threshold": 5, "reward": "Café"}, {"threshold": 10, "reward": "Viennoiserie"}]
 
@@ -52,6 +52,19 @@ def test_next_objective_tiers_first():
 
 def test_next_objective_tiers_after_first():
     assert next_objective("tiers", 5, 0, "", TIERS) == (10, "Viennoiserie")
+
+
+# --- tier_reward_at (used with the atomic increment_tiers RPC) ---------------
+def test_tier_reward_at_intermediate():
+    assert tier_reward_at(5, TIERS) == (True, "Café")
+
+
+def test_tier_reward_at_top():
+    assert tier_reward_at(10, TIERS) == (True, "Viennoiserie")
+
+
+def test_tier_reward_at_miss():
+    assert tier_reward_at(6, TIERS) == (False, None)
 
 
 # --- cashback (integer cents) ----------------------------------------------

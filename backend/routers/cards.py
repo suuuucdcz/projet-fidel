@@ -3,7 +3,7 @@ from schemas import GenerateCardRequest, ScanRequest, CashbackRequest
 from db import supabase
 from auth import get_current_merchant_id
 from limiter import limiter
-from loyalty import compute_scan_result, next_objective, compute_cashback_earn_cents
+from loyalty import compute_scan_result, next_objective, compute_cashback_earn_cents, tier_reward_at
 from wallet_service import wallet_service
 
 router = APIRouter(prefix="/cards", tags=["cards"])
@@ -152,7 +152,23 @@ def scan_card(req: ScanRequest, merchant_id: str = Depends(get_current_merchant_
         except Exception as e:
             print(f"increment_loyalty_points RPC unavailable, using fallback: {e}")
 
-    # Tiers, or fallback when the RPC isn't available: read-modify-write in Python.
+    elif loyalty_type == "tiers" and tiers:
+        # Atomic tier increment; reward is derived from the value reached.
+        max_threshold = max(t["threshold"] for t in tiers)
+        try:
+            rpc_res = supabase.rpc("increment_tiers", {
+                "p_merchant_id": merchant_id,
+                "p_customer_id": req.customer_id,
+                "p_max_threshold": max_threshold,
+            }).execute()
+            if rpc_res.data:
+                row = rpc_res.data[0]
+                new_points = row["new_points"]
+                reward_triggered, reward_unlocked_desc = tier_reward_at(row["reached"], tiers)
+        except Exception as e:
+            print(f"increment_tiers RPC unavailable, using fallback: {e}")
+
+    # Fallback when the RPC isn't available (or unhandled type): read-modify-write in Python.
     if new_points is None:
         card_res = supabase.table("loyalty_cards").select("points").eq("merchant_id", merchant_id).eq("customer_id", req.customer_id).execute()
         if not card_res.data:
@@ -223,14 +239,35 @@ def cashback(req: CashbackRequest, merchant_id: str = Depends(get_current_mercha
     earned_cents = redeemed_cents = None
     if req.operation == "earn":
         earned_cents = compute_cashback_earn_cents(amount_cents, rate)
-        new_cents = balance_cents + earned_cents
+        delta = earned_cents
     else:  # redeem
         if amount_cents > balance_cents:
             raise HTTPException(status_code=400, detail=f"Cagnotte insuffisante (solde : {balance_cents / 100:.2f} €)")
         redeemed_cents = amount_cents
-        new_cents = balance_cents - redeemed_cents
+        delta = -redeemed_cents
 
-    supabase.table("loyalty_cards").update({"balance_cents": new_cents}).eq("merchant_id", merchant_id).eq("customer_id", req.customer_id).execute()
+    # Atomic balance update (prevents double-spend on concurrent redeems).
+    new_cents = None
+    try:
+        rpc_res = supabase.rpc("apply_cashback", {
+            "p_merchant_id": merchant_id,
+            "p_customer_id": req.customer_id,
+            "p_delta_cents": delta,
+        }).execute()
+        if rpc_res.data:
+            new_cents = rpc_res.data[0]["new_balance"]
+        elif req.operation == "redeem":
+            # The non-negative guard refused: the balance changed concurrently.
+            raise HTTPException(status_code=409, detail="Cagnotte modifiée entre-temps, réessayez.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"apply_cashback RPC unavailable, using fallback: {e}")
+
+    if new_cents is None:
+        # Non-atomic fallback (used only until the SQL migration is applied).
+        new_cents = balance_cents + delta
+        supabase.table("loyalty_cards").update({"balance_cents": new_cents}).eq("merchant_id", merchant_id).eq("customer_id", req.customer_id).execute()
 
     supabase.table("scan_logs").insert({
         "merchant_id": merchant_id,

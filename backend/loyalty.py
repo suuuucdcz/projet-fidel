@@ -45,6 +45,17 @@ def compute_scan_result(loyalty_type, current_points, reward_threshold, reward_d
     return new_points, False, None
 
 
+def tier_reward_at(reached, tiers):
+    """Given the balance value `reached` after a +1 scan, return (triggered, reward_desc)
+    for tier cards. Mirrors the tier logic in compute_scan_result, used with the atomic
+    increment_tiers RPC (which returns the pre-reset value reached)."""
+    desc = None
+    for t in _sorted_tiers(tiers):
+        if reached == t["threshold"]:
+            desc = t["reward"]
+    return (desc is not None, desc)
+
+
 def compute_cashback_earn_cents(amount_cents, rate):
     """Cashback earned, in integer cents, for a purchase of `amount_cents` at `rate` percent.
 
