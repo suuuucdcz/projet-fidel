@@ -236,7 +236,7 @@ window.updateOffer = async function(e, merchantId) {
     
     btn.innerText = "Sauvegarde...";
     try {
-        const res = await fetch(`${API_BASE_URL}/dashboard/admin/update_offer`, {
+        const res = await adminFetch(`${API_BASE_URL}/dashboard/admin/update_offer`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({

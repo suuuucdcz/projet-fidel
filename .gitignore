@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 backend/venv/
+.pytest_cache/
 
 # Environment variables
 .env

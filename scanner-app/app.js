@@ -1,5 +1,6 @@
 const API_BASE_URL = 'https://projet-fidel.onrender.com';
 let currentMerchantId = localStorage.getItem('merchant_id');
+let sessionToken = localStorage.getItem('access_token');
 let html5QrCode = null;
 
 // ==========================================
@@ -15,10 +16,38 @@ const resultCard = document.getElementById('scan-result');
 const pointsStatus = document.getElementById('points-status');
 
 // ==========================================
+// Authenticated requests (merchant session token)
+// ==========================================
+// Sends the session JWT as a Bearer header. On 401 (missing/expired token) the
+// merchant is logged out and sent back to the login screen.
+async function authFetch(url, options = {}) {
+    const headers = { ...(options.headers || {}), 'Authorization': `Bearer ${sessionToken || ''}` };
+    const res = await fetch(url, { ...options, headers });
+    if (res.status === 401) {
+        forceLogout();
+        throw new Error('Session expirée. Veuillez vous reconnecter.');
+    }
+    return res;
+}
+
+function forceLogout() {
+    localStorage.removeItem('merchant_id');
+    localStorage.removeItem('access_token');
+    currentMerchantId = null;
+    sessionToken = null;
+    stopScanner();
+    scannerSection.classList.add('hidden');
+    pushSection.classList.add('hidden');
+    if (settingsSection) settingsSection.classList.add('hidden');
+    bottomNav.classList.add('hidden');
+    loginSection.classList.remove('hidden');
+}
+
+// ==========================================
 // Initialization & Navigation
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
-    if (currentMerchantId) {
+    if (currentMerchantId && sessionToken) {
         showScanner();
     } else {
         loginSection.classList.remove('hidden');
@@ -75,8 +104,10 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
         
         const data = await response.json();
         currentMerchantId = data.merchant_id;
+        sessionToken = data.access_token;
         localStorage.setItem('merchant_id', currentMerchantId);
-        
+        localStorage.setItem('access_token', sessionToken);
+
         showScanner();
     } catch (error) {
         errorDiv.innerText = error.message;
@@ -87,14 +118,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     }
 });
 
-document.getElementById('logout-btn').addEventListener('click', () => {
-    localStorage.removeItem('merchant_id');
-    currentMerchantId = null;
-    stopScanner();
-    scannerSection.classList.add('hidden');
-    bottomNav.classList.add('hidden');
-    loginSection.classList.remove('hidden');
-});
+document.getElementById('logout-btn').addEventListener('click', forceLogout);
 
 // ==========================================
 // Scanner Logic
@@ -148,15 +172,12 @@ async function onScanSuccess(decodedText, decodedResult) {
     readerDiv.classList.add('hidden');
     
     try {
-        const response = await fetch(`${API_BASE_URL}/cards/scan`, {
+        const response = await authFetch(`${API_BASE_URL}/cards/scan`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                customer_id: decodedText, 
-                merchant_id: currentMerchantId 
-            })
+            body: JSON.stringify({ customer_id: decodedText })
         });
-        
+
         if (!response.ok) throw new Error('Erreur lors du scan (carte introuvable ou erreur serveur)');
         
         const data = await response.json();
@@ -200,10 +221,10 @@ document.getElementById('push-form').addEventListener('submit', async (e) => {
     btn.disabled = true;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/marketing/push`, {
+        const response = await authFetch(`${API_BASE_URL}/marketing/push`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ merchant_id: currentMerchantId, header, body })
+            body: JSON.stringify({ header, body })
         });
 
         if (!response.ok) throw new Error('Erreur lors de l\'envoi de la campagne');
@@ -246,10 +267,10 @@ document.getElementById('settings-form').addEventListener('submit', async (e) =>
     msg.classList.add('hidden');
 
     try {
-        const response = await fetch(`${API_BASE_URL}/dashboard/admin/update_offer`, {
+        const response = await authFetch(`${API_BASE_URL}/merchants/settings`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ merchant_id: currentMerchantId, reward_threshold: threshold, reward_description: reward })
+            body: JSON.stringify({ reward_threshold: threshold, reward_description: reward })
         });
 
         if (!response.ok) throw new Error('Erreur lors de la sauvegarde');

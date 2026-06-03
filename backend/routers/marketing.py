@@ -1,27 +1,30 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from schemas import PushMessageRequest
 from db import supabase
+from auth import get_current_merchant_id
 from wallet_service import wallet_service
 
 router = APIRouter(prefix="/marketing", tags=["marketing"])
 
 @router.post("/push")
-def push_marketing(req: PushMessageRequest):
+def push_marketing(req: PushMessageRequest, merchant_id: str = Depends(get_current_merchant_id)):
+    # merchant_id comes from the authenticated session token, so a merchant can only
+    # broadcast to its own customers.
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
-        
-    cards_res = supabase.table("loyalty_cards").select("customer_id").eq("merchant_id", req.merchant_id).execute()
+
+    cards_res = supabase.table("loyalty_cards").select("customer_id").eq("merchant_id", merchant_id).execute()
     customers = cards_res.data
-    
+
     sent = 0
     for card in customers:
         try:
             wallet_service.push_marketing_message(card["customer_id"], req.header, req.body)
             sent += 1
-            
+
             # Log the push
             supabase.table("scan_logs").insert({
-                "merchant_id": req.merchant_id,
+                "merchant_id": merchant_id,
                 "customer_id": card["customer_id"],
                 "action_type": "PUSH_CAMPAIGN",
                 "points_added": 0

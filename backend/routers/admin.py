@@ -46,7 +46,7 @@ def get_all_merchants():
     res = supabase.table("merchants").select("*").order("created_at", desc=True).execute()
     return res.data
 
-@router.post("/admin/update_offer")
+@router.post("/admin/update_offer", dependencies=[Depends(require_admin)])
 def update_merchant_offer(req: UpdateOfferRequest):
     """Update reward/design fields for a merchant. Only the fields actually provided
     are written, so a partial caller (e.g. the scanner app editing just the offer)

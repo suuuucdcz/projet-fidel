@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from schemas import GenerateCardRequest, ScanRequest
 from db import supabase
+from auth import get_current_merchant_id
 from wallet_service import wallet_service
 
 router = APIRouter(prefix="/cards", tags=["cards"])
@@ -92,12 +93,14 @@ def generate_card(merchant_id: str, req: GenerateCardRequest):
     return {"wallet_link": link, "customer_id": customer_id}
 
 @router.post("/scan")
-def scan_card(req: ScanRequest):
+def scan_card(req: ScanRequest, merchant_id: str = Depends(get_current_merchant_id)):
+    # merchant_id comes from the authenticated session token, not the request body,
+    # so a merchant can only add points to cards belonging to its own account.
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
 
     # Fetch merchant rules (also validates the merchant exists)
-    m_res = supabase.table("merchants").select("*").eq("id", req.merchant_id).execute()
+    m_res = supabase.table("merchants").select("*").eq("id", merchant_id).execute()
     if not m_res.data:
         raise HTTPException(status_code=404, detail="Merchant not found")
     merchant = m_res.data[0]
@@ -110,7 +113,7 @@ def scan_card(req: ScanRequest):
     reward_triggered = False
     try:
         rpc_res = supabase.rpc("increment_loyalty_points", {
-            "p_merchant_id": req.merchant_id,
+            "p_merchant_id": merchant_id,
             "p_customer_id": req.customer_id,
         }).execute()
         if rpc_res.data:
@@ -122,18 +125,18 @@ def scan_card(req: ScanRequest):
 
     if new_points is None:
         # Fallback (non-atomic) — used only until the SQL migration is applied.
-        card_res = supabase.table("loyalty_cards").select("points").eq("merchant_id", req.merchant_id).eq("customer_id", req.customer_id).execute()
+        card_res = supabase.table("loyalty_cards").select("points").eq("merchant_id", merchant_id).eq("customer_id", req.customer_id).execute()
         if not card_res.data:
             raise HTTPException(status_code=404, detail="Loyalty card not found")
         new_points = card_res.data[0]["points"] + 1
         if new_points >= threshold:
             reward_triggered = True
             new_points = 0
-        supabase.table("loyalty_cards").update({"points": new_points}).eq("merchant_id", req.merchant_id).eq("customer_id", req.customer_id).execute()
+        supabase.table("loyalty_cards").update({"points": new_points}).eq("merchant_id", merchant_id).eq("customer_id", req.customer_id).execute()
 
     # Log the scan
     supabase.table("scan_logs").insert({
-        "merchant_id": req.merchant_id,
+        "merchant_id": merchant_id,
         "customer_id": req.customer_id,
         "action_type": "REWARD" if reward_triggered else "SCAN",
         "points_added": 1

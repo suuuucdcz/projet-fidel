@@ -33,13 +33,18 @@ class GenerateCardRequest(BaseModel):
         return v
 
 class ScanRequest(BaseModel):
+    # merchant_id is derived from the authenticated session token, not the body.
     customer_id: str
-    merchant_id: str
 
 class PushMessageRequest(BaseModel):
-    merchant_id: str
+    # merchant_id is derived from the authenticated session token, not the body.
     header: str
     body: str
+
+class MerchantSettingsUpdate(BaseModel):
+    # Self-service update used by the scanner app for the merchant's own offer.
+    reward_threshold: int = Field(ge=1, le=1000)
+    reward_description: str = Field(min_length=1, max_length=255)
 
 class UpdateOfferRequest(BaseModel):
     merchant_id: str

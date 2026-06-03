@@ -34,7 +34,8 @@ API sur http://localhost:8000 — docs interactives sur http://localhost:8000/do
 
 Voir [`backend/.env.example`](backend/.env.example). En résumé :
 `SUPABASE_URL`, `SUPABASE_KEY`, `GOOGLE_ISSUER_ID`, `GOOGLE_APPLICATION_CREDENTIALS`
-(ou `GOOGLE_CREDENTIALS_JSON`), `ALLOWED_ORIGINS`.
+(ou `GOOGLE_CREDENTIALS_JSON`), `ALLOWED_ORIGINS`, `ADMIN_TOKEN`, `SESSION_SECRET`
+(+ `SESSION_TOKEN_DAYS`).
 
 ## Base de données
 
@@ -50,16 +51,17 @@ Vercel. L'URL de l'API est définie en haut de chaque fichier JS (`API_BASE_URL`
 
 - Ne **jamais** committer `backend/.env` ni `backend/service_account.json` (déjà dans `.gitignore`).
 - Si un secret a fuité (token GitHub, clé de service), le **révoquer et le régénérer** immédiatement.
-- **Garde admin** : les endpoints `/dashboard/admin/*` (lister / créer / supprimer commerçants et
-  clients, historiques) exigent l'en-tête `X-Admin-Token` égal à la variable `ADMIN_TOKEN`. Le
-  dashboard demande ce mot de passe une fois et le stocke. ⚠️ Si `ADMIN_TOKEN` est vide, la garde
-  est **désactivée** (rétro-compatibilité) — définissez-la en production.
+- **Garde admin (agence)** : les endpoints `/dashboard/admin/*` (lister / créer / supprimer
+  commerçants et clients, historiques, `update_offer`) exigent l'en-tête `X-Admin-Token` égal à la
+  variable `ADMIN_TOKEN`. Le dashboard demande ce mot de passe une fois et le stocke. ⚠️ Si
+  `ADMIN_TOKEN` est vide, la garde est **désactivée** (rétro-compatibilité) — définissez-la en prod.
+- **Session commerçant (scanner)** : le login renvoie un **JWT** signé avec `SESSION_SECRET`. Le
+  scanner l'envoie en `Authorization: Bearer ...` ; le backend dérive le `merchant_id` du token
+  (jamais du corps). Un commerçant ne peut donc agir (`/cards/scan`, `/marketing/push`,
+  `POST /merchants/settings`) que sur son propre compte. ⚠️ `SESSION_SECRET` doit être **fixe** en
+  prod (sinon tous les commerçants sont déconnectés à chaque redémarrage).
 
 ## Limitations connues / à faire
 
-- `/cards/scan` fait confiance au `merchant_id` fourni par le client : un token de session
-  commerçant signé (JWT) reste à ajouter pour empêcher un commerçant de créditer la carte d'un
-  autre.
-- `/dashboard/admin/update_offer` est laissé ouvert (utilisé aussi par l'app commerçant) — à
-  scoper par token commerçant lors de l'ajout de l'auth complète.
 - Rate-limiting sur `/merchants/login` et `/cards/generate` (anti brute-force PIN) à prévoir.
+- Row Level Security (RLS) Supabase non activée (la clé serveur a tous les droits).
