@@ -61,7 +61,21 @@ Vercel. L'URL de l'API est définie en haut de chaque fichier JS (`API_BASE_URL`
   `POST /merchants/settings`) que sur son propre compte. ⚠️ `SESSION_SECRET` doit être **fixe** en
   prod (sinon tous les commerçants sont déconnectés à chaque redémarrage).
 
+- **Rate-limiting** : `/merchants/login` (10/min) et `/cards/generate` (20/min) par IP
+  (slowapi, anti brute-force du PIN). Stockage en mémoire (par instance).
+- **RLS Supabase** : non activée par défaut. Pour l'activer, exécuter
+  [`database/enable_rls.sql`](database/enable_rls.sql) — ⚠️ uniquement si le backend utilise la
+  clé **service_role** (détails et rollback dans le fichier).
+
+## Tests & CI
+
+- Tests : `cd backend && python -m pytest tests/` (logique de fidélité + auth + rate-limit).
+- CI : GitHub Actions (`.github/workflows/ci.yml`) lance les tests backend + vérifie la syntaxe JS
+  à chaque push/PR.
+
 ## Limitations connues / à faire
 
-- Rate-limiting sur `/merchants/login` et `/cards/generate` (anti brute-force PIN) à prévoir.
-- Row Level Security (RLS) Supabase non activée (la clé serveur a tous les droits).
+- Les changements de design/classe Wallet ne se propagent qu'aux **nouvelles** cartes
+  (pas de PATCH de la classe pour les cartes déjà enregistrées).
+- Scans **paliers/cashback** non atomiques (course possible si scans simultanés — risque faible).
+- `dashboard.js` génère du HTML inline (à refactoriser en classes CSS).
