@@ -145,7 +145,9 @@ class GoogleWalletService:
             patch_body["messages"] = [{
                 "header": "🎁 Récompense débloquée !",
                 "body": f"Vous avez droit à : {reward_desc}. Montrez votre écran lors de votre prochain passage !",
-                "id": str(uuid.uuid4())
+                "id": str(uuid.uuid4()),
+                # Push an actual notification when the reward unlocks (not just a silent message).
+                "messageType": "TEXT_AND_NOTIFY"
             }]
             
         headers = self._get_auth_headers()
@@ -164,14 +166,17 @@ class GoogleWalletService:
             "message": {
                 "header": header,
                 "body": body,
-                "id": str(uuid.uuid4())
+                "id": str(uuid.uuid4()),
+                # TEXT_AND_NOTIFY pushes an Android notification AND adds the message to
+                # the card. The default (TEXT) only adds it silently — no notification.
+                "messageType": "TEXT_AND_NOTIFY"
             }
         }
         headers = self._get_auth_headers()
         response = requests.post(url, headers=headers, json=message_body)
         if response.status_code != 200:
             print(f"Failed to send marketing message: {response.text}")
-            raise Exception(f"Google Wallet API Error: {response.status_code}")
+            raise Exception(f"Google Wallet API Error {response.status_code}: {response.text}")
         return response.json()
 
 wallet_service = GoogleWalletService()

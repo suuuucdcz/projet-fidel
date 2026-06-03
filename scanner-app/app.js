@@ -273,7 +273,9 @@ document.getElementById('push-form').addEventListener('submit', async (e) => {
         if (!response.ok) throw new Error('Erreur lors de l\'envoi de la campagne');
         
         const data = await response.json();
-        alert(`Campagne envoyée avec succès à ${data.sent} clients !`);
+        let msg = `Campagne envoyée à ${data.sent} client(s).`;
+        if (data.failed) msg += ` ${data.failed} échec(s) (cartes non ajoutées au Wallet ?).`;
+        alert(msg);
         e.target.reset();
     } catch (error) {
         alert(error.message);

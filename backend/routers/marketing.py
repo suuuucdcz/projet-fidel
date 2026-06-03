@@ -17,6 +17,8 @@ def push_marketing(req: PushMessageRequest, merchant_id: str = Depends(get_curre
     customers = cards_res.data
 
     sent = 0
+    failed = 0
+    last_error = None
     for card in customers:
         try:
             wallet_service.push_marketing_message(card["customer_id"], req.header, req.body)
@@ -30,8 +32,13 @@ def push_marketing(req: PushMessageRequest, merchant_id: str = Depends(get_curre
                 "points_added": 0
             }).execute()
         except Exception as e:
+            failed += 1
+            last_error = str(e)
             print(f"Failed to send to {card['customer_id']}: {e}")
+
+    # If nothing went out at all, surface Google's actual error so the merchant can act
+    # (common cause: customers who never tapped "Add to Google Wallet" -> no card object).
     if sent == 0 and len(customers) > 0:
-        raise HTTPException(status_code=500, detail="Echec de l'envoi Google Wallet")
-        
-    return {"status": "success", "sent": sent, "total": len(customers)}
+        raise HTTPException(status_code=502, detail=f"Aucune notification envoyée. Détail Google: {last_error}")
+
+    return {"status": "success", "sent": sent, "failed": failed, "total": len(customers)}
