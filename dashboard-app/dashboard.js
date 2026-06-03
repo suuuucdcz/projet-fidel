@@ -156,6 +156,9 @@ function buildMerchantCardHTML(m, customersCount, rowsHTML, logsRowsHTML) {
     const tiersText = escapeHtml((m.tiers || []).map(t => `${t.threshold} = ${t.reward}`).join('\n'));
     const cashbackRate = escapeHtml(m.cashback_rate != null ? m.cashback_rate : 0);
     const sel = (v) => loyaltyType === v ? ' selected' : '';
+    const showThresh = (loyaltyType === 'points' || loyaltyType === 'stamps') ? 'flex' : 'none';
+    const showTiers = loyaltyType === 'tiers' ? 'flex' : 'none';
+    const showCashback = loyaltyType === 'cashback' ? 'flex' : 'none';
 
     return `
         <div class="merchant-header">
@@ -179,62 +182,89 @@ function buildMerchantCardHTML(m, customersCount, rowsHTML, logsRowsHTML) {
             </div>
         </div>
         
-        <form class="offer-form" onsubmit="updateOffer(event, '${m.id}')" style="flex-wrap: wrap;">
-            <div style="flex:1; min-width:120px;">
-                <label style="font-size:12px; color:gray;">Seuil (Points)</label>
-                <input type="number" id="thresh_${m.id}" value="${escapeHtml(m.reward_threshold)}" required>
+        <form class="offer-form" onsubmit="updateOffer(event, '${m.id}')" style="flex-direction:column; align-items:stretch;">
+            <div class="offer-tabs">
+                <button type="button" class="offer-tab active" onclick="switchOfferTab(event, '${m.id}', 'offre')">Offre</button>
+                <button type="button" class="offer-tab" onclick="switchOfferTab(event, '${m.id}', 'design')">Design</button>
+                <button type="button" class="offer-tab" onclick="switchOfferTab(event, '${m.id}', 'contact')">Contact</button>
             </div>
-            <div style="flex:2; min-width:200px;">
-                <label style="font-size:12px; color:gray;">Récompense</label>
-                <input type="text" id="desc_${m.id}" value="${rewardDesc}" required>
+
+            <!-- Onglet Offre : mécanique de fidélité -->
+            <div id="otab-offre_${m.id}" class="offer-pane" style="display:flex;">
+                <div style="flex:1; min-width:160px;">
+                    <label style="font-size:12px; color:gray;">Type de carte</label>
+                    <select id="ltype_${m.id}" onchange="updateOfferFields('${m.id}')" style="width:100%; padding:10px; height:42px;">
+                        <option value="points"${sel('points')}>Points à seuil</option>
+                        <option value="stamps"${sel('stamps')}>Carte à tampons</option>
+                        <option value="tiers"${sel('tiers')}>Paliers</option>
+                        <option value="cashback"${sel('cashback')}>Cashback (%)</option>
+                    </select>
+                </div>
+
+                <div id="field-threshold_${m.id}" style="display:${showThresh}; flex:3 1 260px; flex-wrap:wrap; gap:10px;">
+                    <div style="flex:1; min-width:100px;">
+                        <label style="font-size:12px; color:gray;">Seuil</label>
+                        <input type="number" id="thresh_${m.id}" value="${escapeHtml(m.reward_threshold)}" min="1">
+                    </div>
+                    <div style="flex:2; min-width:150px;">
+                        <label style="font-size:12px; color:gray;">Récompense</label>
+                        <input type="text" id="desc_${m.id}" value="${rewardDesc}">
+                    </div>
+                </div>
+
+                <div id="field-tiers_${m.id}" style="display:${showTiers}; flex:3 1 240px;">
+                    <div style="flex:1; width:100%;">
+                        <label style="font-size:12px; color:gray;">Paliers — 1 par ligne : <code>seuil = récompense</code></label>
+                        <textarea id="tiers_${m.id}" rows="3" placeholder="5 = Café offert&#10;10 = Viennoiserie&#10;20 = Menu complet" style="width:100%; padding:10px; box-sizing:border-box; font-size:14px;">${tiersText}</textarea>
+                    </div>
+                </div>
+
+                <div id="field-cashback_${m.id}" style="display:${showCashback}; flex:1 1 160px;">
+                    <div style="flex:1; width:100%;">
+                        <label style="font-size:12px; color:gray;">Taux cashback (%)</label>
+                        <input type="number" id="cashback_${m.id}" value="${cashbackRate}" min="0" max="100" step="0.5">
+                    </div>
+                </div>
             </div>
-            <div style="flex:1; min-width:100px;">
-                <label style="font-size:12px; color:gray;">Couleur (Hex)</label>
-                <input type="color" id="color_${m.id}" value="${colorHex}" style="height:44px; padding:2px;">
+
+            <!-- Onglet Design : apparence de la carte -->
+            <div id="otab-design_${m.id}" class="offer-pane" style="display:none;">
+                <div style="flex:1; min-width:100px;">
+                    <label style="font-size:12px; color:gray;">Couleur (Hex)</label>
+                    <input type="color" id="color_${m.id}" value="${colorHex}" style="height:44px; padding:2px;">
+                </div>
+                <div style="flex:2; min-width:200px;">
+                    <label style="font-size:12px; color:gray;">Nom du programme</label>
+                    <input type="text" id="program_${m.id}" value="${programName}" placeholder="${name}" maxlength="100">
+                </div>
+                <div style="flex:1; min-width:120px;">
+                    <label style="font-size:12px; color:gray;">Libellé des points</label>
+                    <input type="text" id="plabel_${m.id}" value="${pointsLabel}" placeholder="Points" maxlength="30">
+                </div>
+                <div style="flex:2; min-width:200px;">
+                    <label style="font-size:12px; color:gray;">Lien Logo (URL)</label>
+                    <input type="url" id="logo_${m.id}" value="${logoUrl}" placeholder="https://...">
+                </div>
+                <div style="flex:2; min-width:200px;">
+                    <label style="font-size:12px; color:gray;">Lien Couverture (URL)</label>
+                    <input type="url" id="hero_${m.id}" value="${heroUrl}" placeholder="https://...">
+                </div>
             </div>
-            <div style="flex:2; min-width:200px;">
-                <label style="font-size:12px; color:gray;">Lien Logo (URL)</label>
-                <input type="url" id="logo_${m.id}" value="${logoUrl}" placeholder="https://...">
+
+            <!-- Onglet Contact : liens sur la carte -->
+            <div id="otab-contact_${m.id}" class="offer-pane" style="display:none;">
+                <div style="flex:1; min-width:140px;">
+                    <label style="font-size:12px; color:gray;">Téléphone</label>
+                    <input type="tel" id="phone_${m.id}" value="${phone}" placeholder="06 12 34 56 78" maxlength="30">
+                </div>
+                <div style="flex:2; min-width:200px;">
+                    <label style="font-size:12px; color:gray;">Site web (URL)</label>
+                    <input type="text" id="website_${m.id}" value="${website}" placeholder="https://..." maxlength="300">
+                </div>
             </div>
-            <div style="flex:2; min-width:200px;">
-                <label style="font-size:12px; color:gray;">Lien Couverture (URL)</label>
-                <input type="url" id="hero_${m.id}" value="${heroUrl}" placeholder="https://...">
-            </div>
-            <div style="flex:2; min-width:200px;">
-                <label style="font-size:12px; color:gray;">Nom du programme</label>
-                <input type="text" id="program_${m.id}" value="${programName}" placeholder="${name}" maxlength="100">
-            </div>
-            <div style="flex:1; min-width:120px;">
-                <label style="font-size:12px; color:gray;">Libellé des points</label>
-                <input type="text" id="plabel_${m.id}" value="${pointsLabel}" placeholder="Points" maxlength="30">
-            </div>
-            <div style="flex:1; min-width:140px;">
-                <label style="font-size:12px; color:gray;">Téléphone</label>
-                <input type="tel" id="phone_${m.id}" value="${phone}" placeholder="06 12 34 56 78" maxlength="30">
-            </div>
-            <div style="flex:2; min-width:200px;">
-                <label style="font-size:12px; color:gray;">Site web (URL)</label>
-                <input type="text" id="website_${m.id}" value="${website}" placeholder="https://..." maxlength="300">
-            </div>
-            <div style="flex:1; min-width:160px;">
-                <label style="font-size:12px; color:gray;">Type de carte</label>
-                <select id="ltype_${m.id}" style="width:100%; padding:10px; height:42px;">
-                    <option value="points"${sel('points')}>Points à seuil</option>
-                    <option value="stamps"${sel('stamps')}>Carte à tampons</option>
-                    <option value="tiers"${sel('tiers')}>Paliers</option>
-                    <option value="cashback"${sel('cashback')}>Cashback (%)</option>
-                </select>
-            </div>
-            <div style="flex:1; min-width:140px;">
-                <label style="font-size:12px; color:gray;">Taux cashback (%) — si type « Cashback »</label>
-                <input type="number" id="cashback_${m.id}" value="${cashbackRate}" min="0" max="100" step="0.5">
-            </div>
-            <div style="flex:2; min-width:240px;">
-                <label style="font-size:12px; color:gray;">Paliers — 1 par ligne : <code>seuil = récompense</code> (si type « Paliers »)</label>
-                <textarea id="tiers_${m.id}" rows="3" placeholder="5 = Café offert&#10;10 = Viennoiserie&#10;20 = Menu complet" style="width:100%; padding:10px; box-sizing:border-box; font-size:14px;">${tiersText}</textarea>
-            </div>
-            <div style="display:flex; align-items:flex-end; width:100%; margin-top:10px;">
-                <button type="submit" class="btn-accent">Sauvegarder les paramètres</button>
+
+            <div style="margin-top:14px;">
+                <button type="submit" class="btn-accent" style="width:auto; padding:10px 20px;">Sauvegarder les paramètres</button>
             </div>
         </form>
 
@@ -265,6 +295,29 @@ function buildMerchantCardHTML(m, customersCount, rowsHTML, logsRowsHTML) {
 // ==========================================
 // Event Listeners & Actions
 // ==========================================
+
+// Switch between the Offre / Design / Contact tabs of a merchant card.
+window.switchOfferTab = function(e, merchantId, tab) {
+    ['offre', 'design', 'contact'].forEach(t => {
+        const pane = document.getElementById(`otab-${t}_${merchantId}`);
+        if (pane) pane.style.display = (t === tab) ? 'flex' : 'none';
+    });
+    const bar = e.target.parentElement;
+    bar.querySelectorAll('.offer-tab').forEach(b => b.classList.remove('active'));
+    e.target.classList.add('active');
+};
+
+// Show only the fields relevant to the selected loyalty type.
+window.updateOfferFields = function(merchantId) {
+    const type = document.getElementById(`ltype_${merchantId}`).value;
+    const setShown = (id, on) => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = on ? 'flex' : 'none';
+    };
+    setShown(`field-threshold_${merchantId}`, type === 'points' || type === 'stamps');
+    setShown(`field-tiers_${merchantId}`, type === 'tiers');
+    setShown(`field-cashback_${merchantId}`, type === 'cashback');
+};
 
 window.updateOffer = async function(e, merchantId) {
     e.preventDefault();
@@ -300,6 +353,11 @@ window.updateOffer = async function(e, merchantId) {
     const cashbackRate = parseFloat(document.getElementById(`cashback_${merchantId}`).value) || 0;
     if (loyaltyType === 'cashback' && cashbackRate <= 0) {
         alert("Type « Cashback » sélectionné mais le taux est à 0 %. Indiquez un taux (ex : 5).");
+        return;
+    }
+
+    if ((loyaltyType === 'points' || loyaltyType === 'stamps') && (!(parseInt(threshold) > 0) || !desc.trim())) {
+        alert("Pour « Points » / « Tampons », renseignez un seuil (> 0) et une récompense.");
         return;
     }
 
