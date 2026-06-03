@@ -2,11 +2,18 @@ import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
+from limiter import limiter
 # Import routers
 from routers import merchants, cards, marketing, admin
 
 app = FastAPI(title="Loyalty Cards Agency Platform API")
+
+# Rate limiting (per client IP) — see limiter.py and the decorated endpoints.
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Allowed front-end origins. Override in production via the ALLOWED_ORIGINS env var
 # (comma-separated). We do NOT use cookies, so allow_credentials stays False, which

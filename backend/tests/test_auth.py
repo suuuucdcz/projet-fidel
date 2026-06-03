@@ -54,3 +54,12 @@ def test_push_requires_auth():
 def test_merchant_settings_requires_auth():
     res = client.post("/merchants/settings", json={"reward_threshold": 5, "reward_description": "x"})
     assert res.status_code == 401
+
+
+def test_login_is_rate_limited():
+    # The login endpoint is limited to 10/minute per IP; the 11th call is rejected.
+    payload = {"email": "x@y.z", "password": "nope"}
+    for _ in range(10):
+        client.post("/merchants/login", json=payload)
+    res = client.post("/merchants/login", json=payload)
+    assert res.status_code == 429

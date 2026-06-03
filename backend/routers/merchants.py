@@ -1,14 +1,16 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from schemas import LoginRequest, MerchantSettingsUpdate
 from db import supabase
 from auth import create_merchant_token, get_current_merchant_id
+from limiter import limiter
 from passlib.context import CryptContext
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 router = APIRouter(prefix="/merchants", tags=["merchants"])
 
 @router.post("/login")
-def login(req: LoginRequest):
+@limiter.limit("10/minute")
+def login(request: Request, req: LoginRequest):
     if not supabase:
         raise HTTPException(status_code=500, detail="Database connection is not configured")
 

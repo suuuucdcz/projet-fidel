@@ -1,14 +1,16 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from schemas import GenerateCardRequest, ScanRequest, CashbackRequest
 from db import supabase
 from auth import get_current_merchant_id
-from loyalty import compute_scan_result, next_objective, compute_cashback_earn
+from limiter import limiter
+from loyalty import compute_scan_result, next_objective, compute_cashback_earn_cents
 from wallet_service import wallet_service
 
 router = APIRouter(prefix="/cards", tags=["cards"])
 
 @router.post("/generate/{merchant_id}")
-def generate_card(merchant_id: str, req: GenerateCardRequest):
+@limiter.limit("20/minute")
+def generate_card(request: Request, merchant_id: str, req: GenerateCardRequest):
     """
     Called by the web registration form to generate a loyalty card
     """
@@ -85,10 +87,11 @@ def generate_card(merchant_id: str, req: GenerateCardRequest):
     )
 
     # For cashback cards, the card shows a euro balance rather than points.
+    # Money is stored as integer cents; convert to euros only for display.
     balance = 0.0
-    bal_res = supabase.table("loyalty_cards").select("balance").eq("merchant_id", merchant_id).eq("customer_id", customer_id).execute()
+    bal_res = supabase.table("loyalty_cards").select("balance_cents").eq("merchant_id", merchant_id).eq("customer_id", customer_id).execute()
     if bal_res.data:
-        balance = float(bal_res.data[0].get("balance") or 0)
+        balance = (bal_res.data[0].get("balance_cents") or 0) / 100.0
 
     # Generate Wallet Link with merchant rules
     link = wallet_service.generate_jwt_url(
@@ -187,13 +190,13 @@ def card_info(customer_id: str, merchant_id: str = Depends(get_current_merchant_
     """Current points + cashback balance of a card, for the authenticated merchant."""
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
-    card_res = supabase.table("loyalty_cards").select("points, balance").eq("merchant_id", merchant_id).eq("customer_id", customer_id).execute()
+    card_res = supabase.table("loyalty_cards").select("points, balance_cents").eq("merchant_id", merchant_id).eq("customer_id", customer_id).execute()
     if not card_res.data:
         raise HTTPException(status_code=404, detail="Loyalty card not found")
     row = card_res.data[0]
     cust = supabase.table("customers").select("first_name").eq("id", customer_id).execute()
     customer_name = cust.data[0]["first_name"] if cust.data else None
-    return {"points": row.get("points", 0), "balance": float(row.get("balance") or 0), "customer_name": customer_name}
+    return {"points": row.get("points", 0), "balance": (row.get("balance_cents") or 0) / 100.0, "customer_name": customer_name}
 
 
 @router.post("/cashback")
@@ -210,22 +213,24 @@ def cashback(req: CashbackRequest, merchant_id: str = Depends(get_current_mercha
         raise HTTPException(status_code=400, detail="Ce commerçant n'utilise pas le cashback")
     rate = float(merchant.get("cashback_rate") or 0)
 
-    card_res = supabase.table("loyalty_cards").select("balance").eq("merchant_id", merchant_id).eq("customer_id", req.customer_id).execute()
+    # Money is stored and computed as integer cents.
+    card_res = supabase.table("loyalty_cards").select("balance_cents").eq("merchant_id", merchant_id).eq("customer_id", req.customer_id).execute()
     if not card_res.data:
         raise HTTPException(status_code=404, detail="Loyalty card not found")
-    balance = float(card_res.data[0].get("balance") or 0)
+    balance_cents = int(card_res.data[0].get("balance_cents") or 0)
+    amount_cents = round(req.amount * 100)
 
-    earned = redeemed = None
+    earned_cents = redeemed_cents = None
     if req.operation == "earn":
-        earned = compute_cashback_earn(req.amount, rate)
-        new_balance = round(balance + earned, 2)
+        earned_cents = compute_cashback_earn_cents(amount_cents, rate)
+        new_cents = balance_cents + earned_cents
     else:  # redeem
-        if req.amount > balance:
-            raise HTTPException(status_code=400, detail=f"Cagnotte insuffisante (solde : {balance:.2f} €)")
-        redeemed = round(req.amount, 2)
-        new_balance = round(balance - redeemed, 2)
+        if amount_cents > balance_cents:
+            raise HTTPException(status_code=400, detail=f"Cagnotte insuffisante (solde : {balance_cents / 100:.2f} €)")
+        redeemed_cents = amount_cents
+        new_cents = balance_cents - redeemed_cents
 
-    supabase.table("loyalty_cards").update({"balance": new_balance}).eq("merchant_id", merchant_id).eq("customer_id", req.customer_id).execute()
+    supabase.table("loyalty_cards").update({"balance_cents": new_cents}).eq("merchant_id", merchant_id).eq("customer_id", req.customer_id).execute()
 
     supabase.table("scan_logs").insert({
         "merchant_id": merchant_id,
@@ -233,6 +238,11 @@ def cashback(req: CashbackRequest, merchant_id: str = Depends(get_current_mercha
         "action_type": "CASHBACK_EARN" if req.operation == "earn" else "CASHBACK_REDEEM",
         "points_added": 0
     }).execute()
+
+    # Convert back to euros only at the API/display boundary.
+    new_balance = new_cents / 100.0
+    earned = earned_cents / 100.0 if earned_cents is not None else None
+    redeemed = redeemed_cents / 100.0 if redeemed_cents is not None else None
 
     label = merchant.get("points_label") or "Cagnotte"
     try:

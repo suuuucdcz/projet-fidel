@@ -45,9 +45,12 @@ def compute_scan_result(loyalty_type, current_points, reward_threshold, reward_d
     return new_points, False, None
 
 
-def compute_cashback_earn(amount, rate):
-    """Cashback earned (euros) for a purchase `amount` at `rate` percent, rounded to cents."""
-    return round(float(amount) * float(rate) / 100.0, 2)
+def compute_cashback_earn_cents(amount_cents, rate):
+    """Cashback earned, in integer cents, for a purchase of `amount_cents` at `rate` percent.
+
+    Money is handled as integer cents everywhere to avoid floating-point rounding drift.
+    """
+    return round(int(amount_cents) * float(rate) / 100.0)
 
 
 def next_objective(loyalty_type, points, reward_threshold, reward_description, tiers):

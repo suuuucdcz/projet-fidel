@@ -24,8 +24,21 @@ ALTER TABLE merchants ADD COLUMN IF NOT EXISTS loyalty_type  VARCHAR(20) DEFAULT
 ALTER TABLE merchants ADD COLUMN IF NOT EXISTS tiers         JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE merchants ADD COLUMN IF NOT EXISTS cashback_rate NUMERIC(5,2) DEFAULT 0;
 
--- Cashback balance ("cagnotte") per loyalty card
-ALTER TABLE loyalty_cards ADD COLUMN IF NOT EXISTS balance NUMERIC(10,2) NOT NULL DEFAULT 0;
+-- Cashback balance ("cagnotte") per loyalty card — stored as integer cents.
+ALTER TABLE loyalty_cards ADD COLUMN IF NOT EXISTS balance_cents INTEGER NOT NULL DEFAULT 0;
+
+-- One-time migration from the old NUMERIC `balance` (euros) to integer cents, then drop it.
+-- Safe to re-run: once `balance` is dropped, this block is skipped.
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'loyalty_cards' AND column_name = 'balance'
+    ) THEN
+        UPDATE loyalty_cards SET balance_cents = ROUND(COALESCE(balance, 0) * 100) WHERE balance_cents = 0;
+        ALTER TABLE loyalty_cards DROP COLUMN balance;
+    END IF;
+END $$;
 
 -- Indexes for frequent lookups
 CREATE INDEX IF NOT EXISTS idx_loyalty_cards_merchant ON loyalty_cards(merchant_id);

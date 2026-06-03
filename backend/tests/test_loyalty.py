@@ -1,5 +1,5 @@
 """Unit tests for the pure loyalty logic — no DB, no network."""
-from loyalty import compute_scan_result, next_objective, compute_cashback_earn
+from loyalty import compute_scan_result, next_objective, compute_cashback_earn_cents
 
 TIERS = [{"threshold": 5, "reward": "Café"}, {"threshold": 10, "reward": "Viennoiserie"}]
 
@@ -54,14 +54,14 @@ def test_next_objective_tiers_after_first():
     assert next_objective("tiers", 5, 0, "", TIERS) == (10, "Viennoiserie")
 
 
-# --- cashback ---------------------------------------------------------------
+# --- cashback (integer cents) ----------------------------------------------
 def test_cashback_earn_basic():
-    assert compute_cashback_earn(20, 5) == 1.0      # 5% of 20€
+    assert compute_cashback_earn_cents(2000, 5) == 100   # 5% of 20.00€ = 1.00€
 
 
 def test_cashback_earn_rounding():
-    assert compute_cashback_earn(9.99, 7) == 0.70   # 0.6993 -> 0.70
+    assert compute_cashback_earn_cents(999, 7) == 70     # 7% of 9.99€ = 0.6993€ -> 70c
 
 
 def test_cashback_earn_zero_rate():
-    assert compute_cashback_earn(50, 0) == 0.0
+    assert compute_cashback_earn_cents(5000, 0) == 0

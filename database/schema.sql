@@ -45,7 +45,7 @@ CREATE TABLE loyalty_cards (
     merchant_id UUID REFERENCES merchants(id) ON DELETE CASCADE,
     customer_id UUID REFERENCES customers(id) ON DELETE CASCADE,
     points INTEGER NOT NULL DEFAULT 0,
-    balance NUMERIC(10,2) NOT NULL DEFAULT 0, -- cashback "cagnotte" in euros
+    balance_cents INTEGER NOT NULL DEFAULT 0, -- cashback "cagnotte", in integer cents
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(merchant_id, customer_id)
 );
