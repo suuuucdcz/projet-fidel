@@ -16,6 +16,14 @@ function escapeHtml(value) {
         .replaceAll("'", '&#39;');
 }
 
+// Short explanation shown under the loyalty-type selector.
+const LOYALTY_DESC = {
+    points: 'X passages = 1 récompense, puis remise à zéro.',
+    stamps: 'Même mécanique que les points, mais affiché « Tampons » sur la carte (ex : 10 tampons = 1 offert).',
+    tiers: 'Plusieurs récompenses à différents paliers ; remise à zéro au dernier palier.',
+    cashback: 'X % du montant dépensé est crédité dans une cagnotte en €.'
+};
+
 // ==========================================
 // Admin authentication (minimal shared-secret guard)
 // ==========================================
@@ -200,10 +208,11 @@ function buildMerchantCardHTML(m, customersCount, rowsHTML, logsRowsHTML) {
                         <option value="cashback"${sel('cashback')}>Cashback (%)</option>
                     </select>
                 </div>
+                <div id="ltype-desc_${m.id}" style="flex-basis:100%; font-size:12px; color:var(--text-muted); margin-top:-2px;">${LOYALTY_DESC[loyaltyType]}</div>
 
                 <div id="field-threshold_${m.id}" style="display:${showThresh}; flex:3 1 260px; flex-wrap:wrap; gap:10px;">
                     <div style="flex:1; min-width:100px;">
-                        <label style="font-size:12px; color:gray;">Seuil</label>
+                        <label id="thresh-label_${m.id}" style="font-size:12px; color:gray;">${loyaltyType === 'stamps' ? 'Nombre de tampons' : 'Seuil'}</label>
                         <input type="number" id="thresh_${m.id}" value="${escapeHtml(m.reward_threshold)}" min="1">
                     </div>
                     <div style="flex:2; min-width:150px;">
@@ -317,6 +326,19 @@ window.updateOfferFields = function(merchantId) {
     setShown(`field-threshold_${merchantId}`, type === 'points' || type === 'stamps');
     setShown(`field-tiers_${merchantId}`, type === 'tiers');
     setShown(`field-cashback_${merchantId}`, type === 'cashback');
+
+    // Explanatory text + contextual label for the threshold field.
+    const descEl = document.getElementById(`ltype-desc_${merchantId}`);
+    if (descEl) descEl.innerText = LOYALTY_DESC[type] || '';
+    const threshLabel = document.getElementById(`thresh-label_${merchantId}`);
+    if (threshLabel) threshLabel.innerText = (type === 'stamps') ? 'Nombre de tampons' : 'Seuil';
+
+    // Suggest a card label that matches the chosen model (only if not customized).
+    const plabel = document.getElementById(`plabel_${merchantId}`);
+    if (plabel) {
+        if (type === 'stamps' && (!plabel.value || plabel.value === 'Points')) plabel.value = 'Tampons';
+        if (type === 'points' && plabel.value === 'Tampons') plabel.value = 'Points';
+    }
 };
 
 window.updateOffer = async function(e, merchantId) {
