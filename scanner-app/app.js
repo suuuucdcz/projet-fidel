@@ -2,16 +2,21 @@ const API_BASE_URL = 'https://projet-fidel.onrender.com';
 let currentMerchantId = localStorage.getItem('merchant_id');
 let html5QrCode = null;
 
+// ==========================================
 // DOM Elements
+// ==========================================
 const loginSection = document.getElementById('login-section');
 const scannerSection = document.getElementById('scanner-section');
 const pushSection = document.getElementById('push-section');
+const settingsSection = document.getElementById('settings-section');
 const bottomNav = document.getElementById('bottom-nav');
 const readerDiv = document.getElementById('reader');
 const resultCard = document.getElementById('scan-result');
 const pointsStatus = document.getElementById('points-status');
 
-// Init
+// ==========================================
+// Initialization & Navigation
+// ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     if (currentMerchantId) {
         showScanner();
@@ -20,28 +25,33 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Navigation
-document.getElementById('nav-scanner').addEventListener('click', () => {
-    document.getElementById('nav-scanner').classList.add('active');
-    document.getElementById('nav-push').classList.remove('active');
-    document.getElementById('nav-settings').classList.remove('active');
-    scannerSection.classList.remove('hidden');
-    pushSection.classList.add('hidden');
-    settingsSection.classList.add('hidden');
-    startScanner();
+function switchTab(activeTabId, activeSection) {
+    // Reset tabs
+    ['nav-scanner', 'nav-push', 'nav-settings'].forEach(id => document.getElementById(id).classList.remove('active'));
+    ['scanner-section', 'push-section', 'settings-section'].forEach(id => document.getElementById(id).classList.add('hidden'));
+    
+    // Set active
+    document.getElementById(activeTabId).classList.add('active');
+    activeSection.classList.remove('hidden');
+    
+    // Manage scanner state
+    if (activeTabId === 'nav-scanner') {
+        startScanner();
+    } else {
+        stopScanner();
+    }
+}
+
+document.getElementById('nav-scanner').addEventListener('click', () => switchTab('nav-scanner', scannerSection));
+document.getElementById('nav-push').addEventListener('click', () => switchTab('nav-push', pushSection));
+document.getElementById('nav-settings').addEventListener('click', () => {
+    switchTab('nav-settings', settingsSection);
+    loadSettings();
 });
 
-document.getElementById('nav-push').addEventListener('click', () => {
-    document.getElementById('nav-push').classList.add('active');
-    document.getElementById('nav-scanner').classList.remove('active');
-    document.getElementById('nav-settings').classList.remove('active');
-    pushSection.classList.remove('hidden');
-    scannerSection.classList.add('hidden');
-    settingsSection.classList.add('hidden');
-    stopScanner();
-});
-
-// Login Form
+// ==========================================
+// Authentication
+// ==========================================
 document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = document.getElementById('email').value;
@@ -77,7 +87,6 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     }
 });
 
-// Logout
 document.getElementById('logout-btn').addEventListener('click', () => {
     localStorage.removeItem('merchant_id');
     currentMerchantId = null;
@@ -87,12 +96,14 @@ document.getElementById('logout-btn').addEventListener('click', () => {
     loginSection.classList.remove('hidden');
 });
 
+// ==========================================
 // Scanner Logic
+// ==========================================
 function showScanner() {
     loginSection.classList.add('hidden');
     scannerSection.classList.remove('hidden');
     pushSection.classList.add('hidden');
-    settingsSection.classList.add('hidden');
+    if (settingsSection) settingsSection.classList.add('hidden');
     bottomNav.classList.remove('hidden');
     startScanner();
 }
@@ -113,14 +124,14 @@ function startScanner() {
         onScanSuccess,
         onScanFailure
     ).catch(err => {
-        console.error("Camera start failed: ", err);
+        console.error("Camera start failed, trying fallback: ", err);
         // Fallback for laptops with no back camera
         html5QrCode.start(
             0, 
             { fps: 10, qrbox: { width: 250, height: 250 } },
             onScanSuccess,
             (e) => {} // ignore fallback scan errors
-        ).catch(e => console.error(e));
+        ).catch(e => console.error("Total camera failure:", e));
     });
 }
 
@@ -128,16 +139,14 @@ function stopScanner() {
     if (html5QrCode && html5QrCode.isScanning) {
         html5QrCode.stop().then(() => {
             html5QrCode.clear();
-        }).catch(err => console.error(err));
+        }).catch(err => console.error("Error stopping scanner:", err));
     }
 }
 
 async function onScanSuccess(decodedText, decodedResult) {
-    // Stop scanning once we get a code
     stopScanner();
     readerDiv.classList.add('hidden');
     
-    // Call API to validate point
     try {
         const response = await fetch(`${API_BASE_URL}/cards/scan`, {
             method: 'POST',
@@ -148,12 +157,21 @@ async function onScanSuccess(decodedText, decodedResult) {
             })
         });
         
-        if (!response.ok) throw new Error('Erreur lors du scan');
+        if (!response.ok) throw new Error('Erreur lors du scan (carte introuvable ou erreur serveur)');
         
         const data = await response.json();
-        pointsStatus.innerText = `Nouveau solde: ${data.new_points} points`;
-        resultCard.classList.remove('hidden');
         
+        if (data.reward_triggered) {
+            pointsStatus.innerText = `Récompense débloquée ! (${data.reward_desc})`;
+            pointsStatus.style.color = "var(--success)";
+            pointsStatus.style.fontWeight = "bold";
+        } else {
+            pointsStatus.innerText = `Nouveau solde: ${data.new_points} points`;
+            pointsStatus.style.color = "var(--text-muted)";
+            pointsStatus.style.fontWeight = "normal";
+        }
+        
+        resultCard.classList.remove('hidden');
     } catch (error) {
         alert(error.message);
         startScanner();
@@ -168,7 +186,9 @@ document.getElementById('next-scan-btn').addEventListener('click', () => {
     startScanner();
 });
 
-// Push Marketing Form
+// ==========================================
+// Marketing Push Logic
+// ==========================================
 document.getElementById('push-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const header = document.getElementById('push-header').value;
@@ -186,7 +206,7 @@ document.getElementById('push-form').addEventListener('submit', async (e) => {
             body: JSON.stringify({ merchant_id: currentMerchantId, header, body })
         });
 
-        if (!response.ok) throw new Error('Erreur lors de l\'envoi');
+        if (!response.ok) throw new Error('Erreur lors de l\'envoi de la campagne');
         
         const data = await response.json();
         alert(`Campagne envoyée avec succès à ${data.sent} clients !`);
@@ -199,29 +219,18 @@ document.getElementById('push-form').addEventListener('submit', async (e) => {
     }
 });
 
+// ==========================================
 // Settings Logic
-const settingsSection = document.getElementById('settings-section');
-document.getElementById('nav-settings').addEventListener('click', () => {
-    document.getElementById('nav-settings').classList.add('active');
-    document.getElementById('nav-scanner').classList.remove('active');
-    document.getElementById('nav-push').classList.remove('active');
-    
-    settingsSection.classList.remove('hidden');
-    scannerSection.classList.add('hidden');
-    pushSection.classList.add('hidden');
-    stopScanner();
-    loadSettings();
-});
-
+// ==========================================
 async function loadSettings() {
     try {
         const response = await fetch(`${API_BASE_URL}/merchants/settings/${currentMerchantId}`);
-        if (!response.ok) throw new Error('Erreur de chargement');
+        if (!response.ok) throw new Error('Erreur de chargement des paramètres');
         const data = await response.json();
         document.getElementById('settings-threshold').value = data.reward_threshold;
         document.getElementById('settings-reward').value = data.reward_description;
     } catch (error) {
-        console.error(error);
+        console.error("Erreur Settings:", error);
     }
 }
 
@@ -255,7 +264,7 @@ document.getElementById('settings-form').addEventListener('submit', async (e) =>
     }
 });
 
-// PWA Service Worker Registration (Dummy for MVP)
+// PWA Service Worker Registration
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         // navigator.serviceWorker.register('/sw.js');

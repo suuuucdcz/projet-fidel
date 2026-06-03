@@ -2,6 +2,10 @@ const API_BASE_URL = 'https://projet-fidel.onrender.com';
 
 document.addEventListener('DOMContentLoaded', fetchAgencyData);
 
+// ==========================================
+// API Calls
+// ==========================================
+
 async function fetchAgencyData() {
     try {
         const res = await fetch(`${API_BASE_URL}/dashboard/admin/merchants`);
@@ -16,105 +20,19 @@ async function fetchAgencyData() {
         }
 
         for (const m of merchants) {
-            // Fetch customers for this merchant
             const custRes = await fetch(`${API_BASE_URL}/dashboard/customers/${m.id}`);
             const customers = await custRes.json();
             
-            // Fetch logs for this merchant
             const logsRes = await fetch(`${API_BASE_URL}/dashboard/admin/logs/${m.id}`);
             const logs = await logsRes.json();
             
             const card = document.createElement('div');
             card.className = 'merchant-card';
             
-            // Build customers table rows
-            let rows = '';
-            if (customers.length === 0) {
-                rows = '<tr><td colspan="4" style="text-align:center; color:gray;">Aucun client</td></tr>';
-            } else {
-                customers.forEach(c => {
-                    const name = c.customers ? `${c.customers.first_name || ''} ${c.customers.last_name || ''}` : 'Inconnu';
-                    rows += `
-                        <tr>
-                            <td><strong>${name}</strong></td>
-                            <td><span class="badge">${c.points} pts</span></td>
-                            <td style="color:gray; font-size:12px;">${new Date(c.created_at).toLocaleDateString()}</td>
-                            <td><button onclick="deleteCustomer('${m.id}', '${c.customer_id}')" style="background:transparent; color:#ff4444; border:1px solid #ff4444; border-radius:4px; padding:4px 8px; cursor:pointer; font-size:11px; font-weight:bold; transition:0.2s;" onmouseover="this.style.background='#ff4444'; this.style.color='white';" onmouseout="this.style.background='transparent'; this.style.color='#ff4444';">Retirer</button></td>
-                        </tr>
-                    `;
-                });
-            }
-
-            let logsRows = '';
-            if (logs.length === 0) {
-                logsRows = '<tr><td colspan="4" style="text-align:center; color:gray;">Aucun historique</td></tr>';
-            } else {
-                logs.forEach(l => {
-                    const clientName = l.customers ? `${l.customers.first_name || ''} ${l.customers.last_name || ''}` : 'Inconnu';
-                    let actionText = '';
-                    let actionColor = 'gray';
-                    if (l.action_type === 'SCAN') { actionText = '+1 Point'; actionColor = 'var(--primary)'; }
-                    if (l.action_type === 'REWARD') { actionText = 'Récompense !'; actionColor = 'var(--success)'; }
-                    if (l.action_type === 'PUSH_CAMPAIGN') { actionText = 'Push Marketing'; actionColor = 'var(--accent)'; }
-                    
-                    logsRows += `
-                        <tr>
-                            <td>${new Date(l.created_at).toLocaleString()}</td>
-                            <td><span style="color: ${actionColor}; font-weight: bold;">${actionText}</span></td>
-                            <td>${clientName}</td>
-                        </tr>
-                    `;
-                });
-            }
-
-            card.innerHTML = `
-                <div class="merchant-header">
-                    <div>
-                        <div class="merchant-title">${m.name}</div>
-                        <div style="color:gray; font-size:14px;">${customers.length} clients</div>
-                    </div>
-                    <div style="display:flex; gap:10px; align-items:center;">
-                        <a href="https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent('https://projet-fidel.vercel.app/?merchant_id=' + m.id)}" target="_blank" style="background:transparent; color: var(--primary); border: 1px solid var(--primary); padding:4px 8px; border-radius:4px; cursor:pointer; font-size:11px; font-weight:bold; text-decoration:none; transition: 0.2s; white-space: nowrap;" onmouseover="this.style.background='var(--primary)'; this.style.color='black';" onmouseout="this.style.background='transparent'; this.style.color='var(--primary)';">QR Code Inscription</a>
-                        <button onclick="deleteMerchant('${m.id}')" style="background:transparent; color: #ff4444; border: 1px solid #ff4444; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:11px; font-weight:bold; transition: 0.2s; white-space: nowrap; width: max-content;" onmouseover="this.style.background='#ff4444'; this.style.color='white';" onmouseout="this.style.background='transparent'; this.style.color='#ff4444';">Supprimer</button>
-                    </div>
-                </div>
-                
-                <form class="offer-form" onsubmit="updateOffer(event, '${m.id}')">
-                    <div style="flex:1;">
-                        <label style="font-size:12px; color:gray;">Seuil (Points)</label>
-                        <input type="number" id="thresh_${m.id}" value="${m.reward_threshold}" required>
-                    </div>
-                    <div style="flex:2;">
-                        <label style="font-size:12px; color:gray;">Récompense</label>
-                        <input type="text" id="desc_${m.id}" value="${m.reward_description}" required>
-                    </div>
-                    <div style="display:flex; align-items:flex-end;">
-                        <button type="submit" class="btn-accent">Sauvegarder l'offre</button>
-                    </div>
-                </form>
-
-                <div style="display:flex; gap: 20px; margin-top: 15px;">
-                    <div style="flex: 1; background: rgba(0,0,0,0.2); border-radius: 8px; overflow:hidden;">
-                        <div style="padding: 10px; background: rgba(0,0,0,0.3); font-weight: bold; font-size: 14px;">Clients (${customers.length})</div>
-                        <table>
-                            <thead>
-                                <tr><th>Client</th><th>Points</th><th>Inscrit le</th><th>Action</th></tr>
-                            </thead>
-                            <tbody>${rows}</tbody>
-                        </table>
-                    </div>
-                    
-                    <div style="flex: 1; background: rgba(0,0,0,0.2); border-radius: 8px; overflow:hidden; max-height: 300px; overflow-y: auto;">
-                        <div style="padding: 10px; background: rgba(0,0,0,0.3); font-weight: bold; font-size: 14px;">Historique Récent</div>
-                        <table>
-                            <thead>
-                                <tr><th>Date</th><th>Action</th><th>Client</th></tr>
-                            </thead>
-                            <tbody>${logsRows}</tbody>
-                        </table>
-                    </div>
-                </div>
-            `;
+            const rows = buildCustomersTableRows(m.id, customers);
+            const logsRows = buildLogsTableRows(logs);
+            
+            card.innerHTML = buildMerchantCardHTML(m, customers.length, rows, logsRows);
             container.appendChild(card);
         }
     } catch (e) {
@@ -122,6 +40,127 @@ async function fetchAgencyData() {
         document.getElementById('merchants-list').innerHTML = '<p style="color:red;">Erreur de chargement</p>';
     }
 }
+
+// ==========================================
+// HTML Templates
+// ==========================================
+
+function buildCustomersTableRows(merchantId, customers) {
+    if (customers.length === 0) {
+        return '<tr><td colspan="4" style="text-align:center; color:gray;">Aucun client</td></tr>';
+    }
+    
+    return customers.map(c => {
+        const name = c.customers ? `${c.customers.first_name || ''} ${c.customers.last_name || ''}` : 'Inconnu';
+        return `
+            <tr>
+                <td><strong>${name}</strong></td>
+                <td><span class="badge">${c.points} pts</span></td>
+                <td style="color:gray; font-size:12px;">${new Date(c.created_at).toLocaleDateString()}</td>
+                <td>
+                    <button onclick="deleteCustomer('${merchantId}', '${c.customer_id}')" 
+                        style="background:transparent; color:#ff4444; border:1px solid #ff4444; border-radius:4px; padding:4px 8px; cursor:pointer; font-size:11px; font-weight:bold; transition:0.2s;" 
+                        onmouseover="this.style.background='#ff4444'; this.style.color='white';" 
+                        onmouseout="this.style.background='transparent'; this.style.color='#ff4444';">
+                        Retirer
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function buildLogsTableRows(logs) {
+    if (logs.length === 0) {
+        return '<tr><td colspan="4" style="text-align:center; color:gray;">Aucun historique</td></tr>';
+    }
+    
+    return logs.map(l => {
+        const clientName = l.customers ? `${l.customers.first_name || ''} ${l.customers.last_name || ''}` : 'Inconnu';
+        let actionText = '';
+        let actionColor = 'gray';
+        
+        if (l.action_type === 'SCAN') { actionText = '+1 Point'; actionColor = 'var(--primary)'; }
+        if (l.action_type === 'REWARD') { actionText = 'Récompense !'; actionColor = 'var(--success)'; }
+        if (l.action_type === 'PUSH_CAMPAIGN') { actionText = 'Push Marketing'; actionColor = 'var(--accent)'; }
+        
+        return `
+            <tr>
+                <td>${new Date(l.created_at).toLocaleString()}</td>
+                <td><span style="color: ${actionColor}; font-weight: bold;">${actionText}</span></td>
+                <td>${clientName}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function buildMerchantCardHTML(m, customersCount, rowsHTML, logsRowsHTML) {
+    const signupUrl = `https://projet-fidel.vercel.app/?merchant_id=${m.id}`;
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(signupUrl)}`;
+    
+    return `
+        <div class="merchant-header">
+            <div>
+                <div class="merchant-title">${m.name}</div>
+                <div style="color:gray; font-size:14px;">${customersCount} clients</div>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <a href="${qrCodeUrl}" target="_blank" 
+                    style="background:transparent; color: var(--primary); border: 1px solid var(--primary); padding:4px 8px; border-radius:4px; cursor:pointer; font-size:11px; font-weight:bold; text-decoration:none; transition: 0.2s; white-space: nowrap;" 
+                    onmouseover="this.style.background='var(--primary)'; this.style.color='black';" 
+                    onmouseout="this.style.background='transparent'; this.style.color='var(--primary)';">
+                    QR Code Inscription
+                </a>
+                <button onclick="deleteMerchant('${m.id}')" 
+                    style="background:transparent; color: #ff4444; border: 1px solid #ff4444; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:11px; font-weight:bold; transition: 0.2s; white-space: nowrap; width: max-content;" 
+                    onmouseover="this.style.background='#ff4444'; this.style.color='white';" 
+                    onmouseout="this.style.background='transparent'; this.style.color='#ff4444';">
+                    Supprimer
+                </button>
+            </div>
+        </div>
+        
+        <form class="offer-form" onsubmit="updateOffer(event, '${m.id}')">
+            <div style="flex:1;">
+                <label style="font-size:12px; color:gray;">Seuil (Points)</label>
+                <input type="number" id="thresh_${m.id}" value="${m.reward_threshold}" required>
+            </div>
+            <div style="flex:2;">
+                <label style="font-size:12px; color:gray;">Récompense</label>
+                <input type="text" id="desc_${m.id}" value="${m.reward_description}" required>
+            </div>
+            <div style="display:flex; align-items:flex-end;">
+                <button type="submit" class="btn-accent">Sauvegarder l'offre</button>
+            </div>
+        </form>
+
+        <div style="display:flex; gap: 20px; margin-top: 15px;">
+            <div style="flex: 1; background: rgba(0,0,0,0.2); border-radius: 8px; overflow:hidden;">
+                <div style="padding: 10px; background: rgba(0,0,0,0.3); font-weight: bold; font-size: 14px;">Clients (${customersCount})</div>
+                <table>
+                    <thead>
+                        <tr><th>Client</th><th>Points</th><th>Inscrit le</th><th>Action</th></tr>
+                    </thead>
+                    <tbody>${rowsHTML}</tbody>
+                </table>
+            </div>
+            
+            <div style="flex: 1; background: rgba(0,0,0,0.2); border-radius: 8px; overflow:hidden; max-height: 300px; overflow-y: auto;">
+                <div style="padding: 10px; background: rgba(0,0,0,0.3); font-weight: bold; font-size: 14px;">Historique Récent</div>
+                <table>
+                    <thead>
+                        <tr><th>Date</th><th>Action</th><th>Client</th></tr>
+                    </thead>
+                    <tbody>${logsRowsHTML}</tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
+// ==========================================
+// Event Listeners & Actions
+// ==========================================
 
 window.updateOffer = async function(e, merchantId) {
     e.preventDefault();
