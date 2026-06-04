@@ -7,22 +7,11 @@
     "programName": "Fidélité Gourmande",
     "programLogo": {
       "sourceUri": {
-        "uri": "https://images.unsplash.com/photo-1558961363-fa8fdf82db35?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60"
-      }
-    },
-    "heroImage": {
-      "sourceUri": {
-        "uri": "https://images.unsplash.com/photo-1550966871-3ed3cdb5ed0c?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80"
+        "uri": "https://placehold.co/512x512/FF9800/ffffff/png?text=%E2%98%85"
       }
     },
     "reviewStatus": "UNDER_REVIEW",
     "hexBackgroundColor": "#FF9800",
-    "locations": [
-      {
-        "latitude": 48.8566,
-        "longitude": 2.3522
-      }
-    ],
     "callbackOptions": {
       "url": "https://projet-fidel.onrender.com/callbacks/google-wallet"
     }

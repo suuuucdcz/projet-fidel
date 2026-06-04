@@ -75,8 +75,11 @@ class GoogleWalletService:
             loyalty_class["hexBackgroundColor"] = color_hex
         if logo_url:
             loyalty_class["programLogo"]["sourceUri"]["uri"] = logo_url
+        # Hero banner is optional: only show it when the merchant set one (no random default).
         if hero_url:
-            loyalty_class["heroImage"]["sourceUri"]["uri"] = hero_url
+            loyalty_class["heroImage"] = {"sourceUri": {"uri": hero_url}}
+        else:
+            loyalty_class.pop("heroImage", None)
 
         # Contact links shown on the card (phone / website)
         links = []
