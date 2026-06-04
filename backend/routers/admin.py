@@ -73,13 +73,15 @@ def update_merchant_offer(req: UpdateOfferRequest):
 
     # Propagate design to the Google Wallet class so cards ALREADY saved by customers
     # update too (name, logo, banner, colour, links). Re-read the full design first.
+    # The result is returned so the dashboard can show whether Google accepted it.
+    wallet_sync = None
     try:
         m = supabase.table("merchants").select(
             "name, program_name, color_hex, logo_url, hero_url, phone, website"
         ).eq("id", req.merchant_id).execute()
         if m.data:
             mm = m.data[0]
-            wallet_service.update_class(
+            wallet_sync = wallet_service.update_class(
                 req.merchant_id, mm["name"],
                 program_name=mm.get("program_name") or "",
                 color_hex=mm.get("color_hex") or "",
@@ -90,8 +92,9 @@ def update_merchant_offer(req: UpdateOfferRequest):
             )
     except Exception as e:
         print(f"Warning: Wallet class sync failed: {e}")
+        wallet_sync = {"ok": False, "status": 0, "error": str(e)[:400]}
 
-    return {"status": "success"}
+    return {"status": "success", "wallet_sync": wallet_sync}
 
 @router.post("/admin/merchants/create", dependencies=[Depends(require_admin)])
 def create_merchant(req: CreateMerchantRequest):

@@ -171,16 +171,20 @@ class GoogleWalletService:
         if links:
             patch["linksModuleData"] = {"uris": links}
 
-        headers = self._get_auth_headers()
-        response = requests.patch(url, headers=headers, json=patch)
-        if response.status_code == 404:
-            # No class yet (no card generated for this merchant) -> nothing to update;
-            # it will be created with these values on the first card.
-            print(f"Wallet class {class_id} not found yet; nothing to sync.")
-            return None
-        if response.status_code != 200:
-            print(f"Failed to update Wallet class: {response.text}")
-        return response.json() if response.status_code == 200 else None
+        try:
+            headers = self._get_auth_headers()
+            response = requests.patch(url, headers=headers, json=patch)
+        except Exception as e:
+            print(f"Wallet class sync exception: {e}")
+            return {"ok": False, "status": 0, "error": f"{type(e).__name__}: {e}"[:400], "class_id": class_id}
+
+        if response.status_code == 200:
+            return {"ok": True, "status": 200, "error": None, "class_id": class_id}
+
+        # Surface Google's exact response so the failure is diagnosable (404 = class
+        # doesn't exist yet, 400 = bad field/image, 403 = permissions, etc.).
+        print(f"Failed to update Wallet class ({response.status_code}): {response.text}")
+        return {"ok": False, "status": response.status_code, "error": response.text[:400], "class_id": class_id}
 
     def update_points(self, customer_id: str, new_points: int, threshold: int, reward_desc: str, reward_unlocked: bool = False):
         """

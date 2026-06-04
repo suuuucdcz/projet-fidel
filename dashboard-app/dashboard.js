@@ -494,12 +494,24 @@ window.updateOffer = async function(e, merchantId) {
             })
         });
         if (!res.ok) throw new Error("Erreur");
+        const data = await res.json().catch(() => ({}));
         btn.innerText = "Sauvegardé !";
         btn.style.background = "var(--success)";
+
+        // Show whether Google Wallet accepted the design sync (key for diagnosing
+        // "the card doesn't change").
+        const ws = data.wallet_sync;
+        if (ws && ws.ok === false) {
+            alert("Réglages enregistrés ✅, mais la carte Google Wallet n'a PAS été mise à jour ❌.\n\n"
+                + "Réponse Google (HTTP " + ws.status + ") :\n" + (ws.error || 'inconnue'));
+        } else if (ws && ws.ok === true) {
+            btn.innerText = "Carte synchronisée ✓";
+        }
+
         setTimeout(() => {
             btn.innerText = "Sauvegarder les paramètres";
             btn.style.background = "";
-        }, 2000);
+        }, 2500);
     } catch (err) {
         alert("Erreur lors de la mise à jour");
         btn.innerText = "Sauvegarder les paramètres";
