@@ -154,6 +154,10 @@ class GoogleWalletService:
         patch = {
             "issuerName": merchant_name,
             "programName": program_name or merchant_name,
+            # Google auto-approves classes; updating one requires resubmitting it for
+            # review. Without this, the API rejects the whole PATCH with HTTP 400
+            # "Invalid review status APPROVED. Use UNDER_REVIEW instead."
+            "reviewStatus": "UNDER_REVIEW",
         }
         if color_hex:
             patch["hexBackgroundColor"] = color_hex
