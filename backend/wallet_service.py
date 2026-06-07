@@ -28,7 +28,7 @@ class GoogleWalletService:
                 return
             except Exception as e:
                 print(f"Failed to load credentials from ENV: {e}")
-        
+
         if os.path.exists(self.credentials_path):
             self.credentials = Credentials.from_service_account_file(
                 self.credentials_path, scopes=self.scopes
@@ -53,35 +53,22 @@ class GoogleWalletService:
     def _format_eur(value) -> str:
         return f"{float(value or 0):.2f} €".replace(".", ",")
 
-    def generate_jwt_url(self, customer_id: str, merchant_id: str, points: int, merchant_name: str, threshold: int, reward_desc: str, first_name: str, color_hex: str, logo_url: str, hero_url: str, program_name: str = "", points_label: str = "", phone: str = "", website: str = "", loyalty_type: str = "points", balance: float = 0.0) -> str:
-        """
-        Generates a JWT link that the user clicks to add the card to Google Wallet.
-        """
-        template_path = os.path.join(os.path.dirname(__file__), "wallet_template.json")
-        with open(template_path, "r", encoding="utf-8") as f:
-            template = json.load(f)
+    @staticmethod
+    def _ls(value: str):
+        """Google Wallet LocalizedString."""
+        return {"defaultValue": {"language": "fr", "value": value or ""}}
 
-        object_id = f"{self.issuer_id}.{customer_id}"
-        class_id = f"{self.issuer_id}.class_{merchant_id}"
-        
-        loyalty_object = template["loyaltyObject"]
-        loyalty_class = template["loyaltyClass"]
-
-        # Customize class based on merchant
-        loyalty_class["id"] = class_id
-        loyalty_class["issuerName"] = merchant_name
-        loyalty_class["programName"] = program_name or merchant_name
-        if color_hex:
-            loyalty_class["hexBackgroundColor"] = color_hex
+    def _object_design(self, merchant_name, program_name="", color_hex="", logo_url="", hero_url="", phone="", website=""):
+        """Design fields shared by a generic object (generic passes carry design per-object)."""
+        design = {
+            "cardTitle": self._ls(program_name or merchant_name),
+            "hexBackgroundColor": color_hex or "#FF9800",
+        }
         if logo_url:
-            loyalty_class["programLogo"]["sourceUri"]["uri"] = logo_url
-        # Hero banner is optional: only show it when the merchant set one (no random default).
+            design["logo"] = {"sourceUri": {"uri": logo_url}}
         if hero_url:
-            loyalty_class["heroImage"] = {"sourceUri": {"uri": hero_url}}
-        else:
-            loyalty_class.pop("heroImage", None)
+            design["heroImage"] = {"sourceUri": {"uri": hero_url}}
 
-        # Contact links shown on the card (phone / website)
         links = []
         if phone:
             links.append({"uri": f"tel:{phone}", "description": "Téléphone", "id": "phone"})
@@ -89,43 +76,37 @@ class GoogleWalletService:
             uri = website if website.startswith("http") else f"https://{website}"
             links.append({"uri": uri, "description": "Site web", "id": "website"})
         if links:
-            loyalty_class["linksModuleData"] = {"uris": links}
-        else:
-            loyalty_class.pop("linksModuleData", None)
+            design["linksModuleData"] = {"uris": links}
+        return design
 
-        # Customize object for customer
-        loyalty_object["id"] = object_id
-        loyalty_object["classId"] = class_id
-        loyalty_object["barcode"]["value"] = customer_id
+    def generate_jwt_url(self, customer_id: str, merchant_id: str, points: int, merchant_name: str, threshold: int, reward_desc: str, first_name: str, color_hex: str, logo_url: str, hero_url: str, program_name: str = "", points_label: str = "", phone: str = "", website: str = "", loyalty_type: str = "points", balance: float = 0.0) -> str:
+        """Generate a 'Save to Google Wallet' JWT link using a Generic pass (more design freedom)."""
+        object_id = f"{self.issuer_id}.{customer_id}"
+        class_id = f"{self.issuer_id}.class_{merchant_id}"
 
         if loyalty_type == "cashback":
-            # Show a euro balance ("cagnotte") instead of integer points.
-            loyalty_object["loyaltyPoints"]["label"] = points_label or "Cagnotte"
-            loyalty_object["loyaltyPoints"]["balance"] = {"string": self._format_eur(balance)}
-            objective = {
-                "id": "points_info",
-                "header": "Votre cagnotte fidélité",
-                "body": f"{self._format_eur(balance)} à utiliser lors de vos prochains achats."
-            }
+            header_value = self._format_eur(balance)
+            objective_body = f"{self._format_eur(balance)} à utiliser lors de vos prochains achats."
         else:
-            loyalty_object["loyaltyPoints"]["balance"] = {"int": points}
-            if points_label:
-                loyalty_object["loyaltyPoints"]["label"] = points_label
-            objective = {
-                "id": "points_info",
-                "header": f"Objectif: {reward_desc}",
-                "body": f"Plus que {max(threshold - points, 0)} points avant votre récompense !"
-            }
+            label = points_label or "Points"
+            header_value = f"{points} {label}"
+            objective_body = f"Plus que {max(threshold - points, 0)} {label.lower()} avant : {reward_desc}"
 
-        # Add personalized greeting and rules
-        loyalty_object["textModulesData"] = [
-            objective,
-            {
-                "id": "customer_greeting",
-                "header": "Titulaire de la carte",
-                "body": first_name
-            }
-        ]
+        generic_object = {
+            "id": object_id,
+            "classId": class_id,
+            "genericType": "GENERIC_LOYALTY_CARD",
+            "header": self._ls(header_value),
+            "subheader": self._ls(first_name),
+            "barcode": {"type": "QR_CODE", "value": customer_id, "alternateText": ""},
+            "textModulesData": [
+                {"id": "objective", "header": "Objectif", "body": objective_body},
+            ],
+        }
+        generic_object.update(self._object_design(merchant_name, program_name, color_hex, logo_url, hero_url, phone, website))
+
+        # Generic classes are minimal; the design lives on the object.
+        generic_class = {"id": class_id}
 
         payload = {
             "iss": self.credentials.service_account_email if self.credentials else "dummy@email.com",
@@ -133,135 +114,88 @@ class GoogleWalletService:
             "typ": "savetowallet",
             "iat": int(time.time()),
             "payload": {
-                "loyaltyClasses": [loyalty_class],
-                "loyaltyObjects": [loyalty_object]
+                "genericClasses": [generic_class],
+                "genericObjects": [generic_object]
             }
         }
-        
+
         if self.private_key:
              token = jwt.encode(payload, self.private_key, algorithm="RS256")
         else:
              token = "DUMMY_TOKEN"
-             
+
         return f"https://pay.google.com/gp/v/save/{token}"
 
-    def update_class(self, merchant_id: str, merchant_name: str, program_name: str = "", color_hex: str = "", logo_url: str = "", hero_url: str = "", phone: str = "", website: str = ""):
-        """PATCH the merchant's Wallet class so design changes (name, logo, banner, colour,
-        links) reflect on ALL cards already saved by customers — not just new ones."""
-        class_id = f"{self.issuer_id}.class_{merchant_id}"
-        url = f"{self.base_url}/loyaltyClass/{class_id}"
+    def update_object_design(self, customer_id: str, merchant_name: str, program_name: str = "", color_hex: str = "", logo_url: str = "", hero_url: str = "", phone: str = "", website: str = ""):
+        """PATCH one generic object's design. Returns a diagnostic dict {ok,status,error}.
 
-        patch = {
-            "issuerName": merchant_name,
-            "programName": program_name or merchant_name,
-            # Google auto-approves classes; updating one requires resubmitting it for
-            # review. Without this, the API rejects the whole PATCH with HTTP 400
-            # "Invalid review status APPROVED. Use UNDER_REVIEW instead."
-            "reviewStatus": "UNDER_REVIEW",
-        }
-        if color_hex:
-            patch["hexBackgroundColor"] = color_hex
-        if logo_url:
-            patch["programLogo"] = {"sourceUri": {"uri": logo_url}}
-        if hero_url:
-            patch["heroImage"] = {"sourceUri": {"uri": hero_url}}
-
-        links = []
-        if phone:
-            links.append({"uri": f"tel:{phone}", "description": "Téléphone", "id": "phone"})
-        if website:
-            uri = website if website.startswith("http") else f"https://{website}"
-            links.append({"uri": uri, "description": "Site web", "id": "website"})
-        if links:
-            patch["linksModuleData"] = {"uris": links}
-
+        Generic passes store design per-object, so propagating a merchant's design change
+        means calling this for each of the merchant's cards (see admin.update_offer)."""
+        object_id = f"{self.issuer_id}.{customer_id}"
+        url = f"{self.base_url}/genericObject/{object_id}"
+        patch = self._object_design(merchant_name, program_name, color_hex, logo_url, hero_url, phone, website)
         try:
             headers = self._get_auth_headers()
             response = requests.patch(url, headers=headers, json=patch)
         except Exception as e:
-            print(f"Wallet class sync exception: {e}")
-            return {"ok": False, "status": 0, "error": f"{type(e).__name__}: {e}"[:400], "class_id": class_id}
-
+            return {"ok": False, "status": 0, "error": f"{type(e).__name__}: {e}"[:300]}
         if response.status_code == 200:
-            return {"ok": True, "status": 200, "error": None, "class_id": class_id}
+            return {"ok": True, "status": 200, "error": None}
+        return {"ok": False, "status": response.status_code, "error": response.text[:300]}
 
-        # Surface Google's exact response so the failure is diagnosable (404 = class
-        # doesn't exist yet, 400 = bad field/image, 403 = permissions, etc.).
-        print(f"Failed to update Wallet class ({response.status_code}): {response.text}")
-        return {"ok": False, "status": response.status_code, "error": response.text[:400], "class_id": class_id}
-
-    def update_points(self, customer_id: str, new_points: int, threshold: int, reward_desc: str, reward_unlocked: bool = False):
-        """
-        Updates an existing LoyaltyObject in Google Wallet and triggers a notification.
-        """
+    def update_points(self, customer_id: str, new_points: int, threshold: int, reward_desc: str, reward_unlocked: bool = False, points_label: str = "Points"):
+        """Update a generic object's points header/objective and notify the customer."""
         object_id = f"{self.issuer_id}.{customer_id}"
-        url = f"{self.base_url}/loyaltyObject/{object_id}"
-        
+        url = f"{self.base_url}/genericObject/{object_id}"
+        label = points_label or "Points"
         remaining = max(threshold - new_points, 0)
-        
+
         if reward_unlocked:
             body_text = f"Félicitations ! Vous avez débloqué : {reward_desc}. Votre carte repart à zéro !"
         else:
-            body_text = f"Plus que {remaining} points avant : {reward_desc} !"
+            body_text = f"Plus que {remaining} {label.lower()} avant : {reward_desc} !"
 
         patch_body = {
-            "loyaltyPoints": {
-                "balance": {
-                    "int": new_points
-                }
-            },
+            "header": self._ls(f"{new_points} {label}"),
             "textModulesData": [
-                {
-                    "id": "points_info",
-                    "header": f"Objectif: {reward_desc}",
-                    "body": body_text
-                }
-            ]
+                {"id": "objective", "header": "Objectif", "body": body_text},
+            ],
         }
-        
-        # If reward unlocked, optionally push a Message as well for better visibility
         if reward_unlocked:
             patch_body["messages"] = [{
                 "header": "🎁 Récompense débloquée !",
                 "body": f"Vous avez droit à : {reward_desc}. Montrez votre écran lors de votre prochain passage !",
                 "id": str(uuid.uuid4()),
-                # Push an actual notification when the reward unlocks (not just a silent message).
                 "messageType": "TEXT_AND_NOTIFY"
             }]
-            
+
         headers = self._get_auth_headers()
-        url_with_notify = f"{url}?notifyOnUpdate=true"
-        
-        response = requests.patch(url_with_notify, headers=headers, json=patch_body)
+        response = requests.patch(f"{url}?notifyOnUpdate=true", headers=headers, json=patch_body)
         if response.status_code != 200:
-            print(f"Failed to update Wallet Object: {response.text}")
+            print(f"Failed to update Wallet object: {response.text}")
         return response.json() if response.status_code == 200 else None
 
     def update_cashback(self, customer_id: str, new_balance: float, points_label: str = "", earned: float = None, redeemed: float = None):
-        """Update a cashback card's euro balance and notify the customer."""
+        """Update a cashback generic object's euro balance and notify the customer."""
         object_id = f"{self.issuer_id}.{customer_id}"
-        url = f"{self.base_url}/loyaltyObject/{object_id}"
+        url = f"{self.base_url}/genericObject/{object_id}"
         balance_str = self._format_eur(new_balance)
 
         if earned is not None:
-            header = "💰 Cashback crédité !"
+            mheader = "💰 Cashback crédité !"
             msg_body = f"+{self._format_eur(earned)} sur votre cagnotte. Solde : {balance_str}."
         else:
-            header = "🛍️ Cagnotte utilisée"
+            mheader = "🛍️ Cagnotte utilisée"
             msg_body = f"-{self._format_eur(redeemed)} utilisés. Solde restant : {balance_str}."
 
         patch_body = {
-            "loyaltyPoints": {
-                "label": points_label or "Cagnotte",
-                "balance": {"string": balance_str}
-            },
-            "textModulesData": [{
-                "id": "points_info",
-                "header": "Votre cagnotte fidélité",
-                "body": f"{balance_str} à utiliser lors de vos prochains achats."
-            }],
+            "header": self._ls(balance_str),
+            "textModulesData": [
+                {"id": "objective", "header": points_label or "Cagnotte",
+                 "body": f"{balance_str} à utiliser lors de vos prochains achats."},
+            ],
             "messages": [{
-                "header": header,
+                "header": mheader,
                 "body": msg_body,
                 "id": str(uuid.uuid4()),
                 "messageType": "TEXT_AND_NOTIFY"
@@ -275,8 +209,8 @@ class GoogleWalletService:
 
     def push_marketing_message(self, customer_id: str, header: str, body: str):
         object_id = f"{self.issuer_id}.{customer_id}"
-        url = f"{self.base_url}/loyaltyObject/{object_id}/addMessage"
-        
+        url = f"{self.base_url}/genericObject/{object_id}/addMessage"
+
         message_body = {
             "message": {
                 "header": header,

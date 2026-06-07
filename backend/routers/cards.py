@@ -191,7 +191,7 @@ def scan_card(req: ScanRequest, merchant_id: str = Depends(get_current_merchant_
     next_threshold, next_reward = next_objective(loyalty_type, new_points, threshold, reward_desc, tiers)
     wallet_desc = reward_unlocked_desc if reward_triggered else next_reward
     try:
-        wallet_service.update_points(req.customer_id, new_points, next_threshold, wallet_desc, reward_unlocked=reward_triggered)
+        wallet_service.update_points(req.customer_id, new_points, next_threshold, wallet_desc, reward_unlocked=reward_triggered, points_label=merchant.get("points_label") or "Points")
     except Exception as e:
         print(f"Warning: Failed to push update to wallet: {e}")
 

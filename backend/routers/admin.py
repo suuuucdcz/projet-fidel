@@ -71,28 +71,38 @@ def update_merchant_offer(req: UpdateOfferRequest):
 
     supabase.table("merchants").update(updates).eq("id", req.merchant_id).execute()
 
-    # Propagate design to the Google Wallet class so cards ALREADY saved by customers
-    # update too (name, logo, banner, colour, links). Re-read the full design first.
-    # The result is returned so the dashboard can show whether Google accepted it.
+    # Generic passes carry their design per-OBJECT, so propagate the design to every
+    # card already saved by this merchant's customers. The aggregate result is returned
+    # so the dashboard can show whether Google accepted the updates.
     wallet_sync = None
     try:
         m = supabase.table("merchants").select(
             "name, program_name, color_hex, logo_url, hero_url, phone, website"
         ).eq("id", req.merchant_id).execute()
+        cards = supabase.table("loyalty_cards").select("customer_id").eq("merchant_id", req.merchant_id).execute()
+        customer_ids = [c["customer_id"] for c in (cards.data or [])]
         if m.data:
             mm = m.data[0]
-            wallet_sync = wallet_service.update_class(
-                req.merchant_id, mm["name"],
-                program_name=mm.get("program_name") or "",
-                color_hex=mm.get("color_hex") or "",
-                logo_url=mm.get("logo_url") or "",
-                hero_url=mm.get("hero_url") or "",
-                phone=mm.get("phone") or "",
-                website=mm.get("website") or "",
-            )
+            updated = 0
+            last_error = None
+            for cid in customer_ids:
+                r = wallet_service.update_object_design(
+                    cid, mm["name"],
+                    program_name=mm.get("program_name") or "",
+                    color_hex=mm.get("color_hex") or "",
+                    logo_url=mm.get("logo_url") or "",
+                    hero_url=mm.get("hero_url") or "",
+                    phone=mm.get("phone") or "",
+                    website=mm.get("website") or "",
+                )
+                if r and r.get("ok"):
+                    updated += 1
+                elif r:
+                    last_error = f"HTTP {r.get('status')}: {r.get('error')}"
+            wallet_sync = {"ok": last_error is None, "updated": updated, "total": len(customer_ids), "error": last_error}
     except Exception as e:
-        print(f"Warning: Wallet class sync failed: {e}")
-        wallet_sync = {"ok": False, "status": 0, "error": str(e)[:400]}
+        print(f"Warning: Wallet design sync failed: {e}")
+        wallet_sync = {"ok": False, "updated": 0, "total": 0, "error": str(e)[:400]}
 
     return {"status": "success", "wallet_sync": wallet_sync}
 

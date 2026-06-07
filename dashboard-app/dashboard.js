@@ -502,10 +502,11 @@ window.updateOffer = async function(e, merchantId) {
         // "the card doesn't change").
         const ws = data.wallet_sync;
         if (ws && ws.ok === false) {
-            alert("Réglages enregistrés ✅, mais la carte Google Wallet n'a PAS été mise à jour ❌.\n\n"
-                + "Réponse Google (HTTP " + ws.status + ") :\n" + (ws.error || 'inconnue'));
+            alert("Réglages enregistrés ✅, mais la mise à jour des cartes Wallet a échoué ❌.\n\n"
+                + (ws.error || 'erreur inconnue')
+                + (ws.total ? `\n\n(${ws.updated || 0}/${ws.total} cartes mises à jour)` : ''));
         } else if (ws && ws.ok === true) {
-            btn.innerText = "Carte synchronisée ✓";
+            btn.innerText = ws.total ? `Cartes synchro ✓ (${ws.updated}/${ws.total})` : "Sauvegardé ✓";
         }
 
         setTimeout(() => {
