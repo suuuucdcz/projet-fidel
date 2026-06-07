@@ -45,8 +45,7 @@ window.updateCardPreview = function (merchantId) {
     card.style.color = contrastText(color);
 
     setText(`cp-program_${merchantId}`, val('program') || card.dataset.name || '');
-    setText(`cp-plabel_${merchantId}`, val('plabel') || 'Points');
-    setText(`cp-reward_${merchantId}`, 'Objectif : ' + (val('desc') || '—'));
+    setText(`cp-header_${merchantId}`, '120 ' + (val('plabel') || 'Points'));
 
     const logo = document.getElementById(`cp-logo_${merchantId}`);
     const logoUrl = val('logo');
@@ -346,19 +345,15 @@ function buildMerchantCardHTML(m, customersCount, rowsHTML, logsRowsHTML) {
             <div class="cp-card" id="cp-card_${m.id}" data-name="${name}" style="background:${colorHex}; color:${previewText};">
                 <div class="cp-head">
                     <img class="cp-logo" id="cp-logo_${m.id}" src="${logoUrl}" alt="" style="${logoUrl ? '' : 'display:none;'}" onerror="this.style.display='none'">
-                    <div class="cp-issuer">${name}</div>
+                    <div class="cp-cardtitle" id="cp-program_${m.id}">${programName || name}</div>
                 </div>
-                <div class="cp-program" id="cp-program_${m.id}">${programName || name}</div>
-                <div class="cp-points">
-                    <span class="cp-plabel" id="cp-plabel_${m.id}">${pointsLabel}</span>
-                    <span class="cp-balance">120</span>
-                </div>
+                <div class="cp-header" id="cp-header_${m.id}">120 ${pointsLabel}</div>
+                <div class="cp-subheader">Jean Dupont</div>
                 <div class="cp-hero" id="cp-hero-wrap_${m.id}" style="${heroUrl ? '' : 'display:none;'}">
                     <img id="cp-hero_${m.id}" src="${heroUrl}" alt="" onerror="this.parentElement.style.display='none'">
                 </div>
-                <div class="cp-reward" id="cp-reward_${m.id}">Objectif : ${rewardDesc || '—'}</div>
             </div>
-            <div class="cp-caption">Aperçu de la carte (indicatif)</div>
+            <div class="cp-caption">Aperçu — l'objectif et les infos s'affichent au dos de la carte</div>
         </div>
         </div>
 
