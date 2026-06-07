@@ -349,6 +349,8 @@ function buildMerchantCardHTML(m, customersCount, rowsHTML, logsRowsHTML) {
                 </div>
                 <div class="cp-header" id="cp-header_${m.id}">120 ${pointsLabel}</div>
                 <div class="cp-subheader">Jean Dupont</div>
+                <div class="cp-qr"><img src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23fff'/><g fill='%23000'><path d='M6 6h22v22H6z'/><rect x='10' y='10' width='14' height='14' fill='%23fff'/><rect x='13' y='13' width='8' height='8'/><path d='M72 6h22v22H72z'/><rect x='76' y='10' width='14' height='14' fill='%23fff'/><rect x='79' y='13' width='8' height='8'/><path d='M6 72h22v22H6z'/><rect x='10' y='76' width='14' height='14' fill='%23fff'/><rect x='13' y='79' width='8' height='8'/><rect x='36' y='10' width='5' height='5'/><rect x='46' y='14' width='5' height='5'/><rect x='56' y='10' width='5' height='5'/><rect x='40' y='40' width='5' height='5'/><rect x='52' y='46' width='5' height='5'/><rect x='62' y='40' width='5' height='5'/><rect x='72' y='52' width='5' height='5'/><rect x='40' y='62' width='5' height='5'/><rect x='52' y='72' width='5' height='5'/><rect x='62' y='62' width='5' height='5'/><rect x='82' y='62' width='5' height='5'/><rect x='14' y='40' width='5' height='5'/><rect x='14' y='52' width='5' height='5'/></g></svg>" alt="QR"></div>
+                <div class="cp-qrnote">Code à scanner</div>
                 <div class="cp-hero" id="cp-hero-wrap_${m.id}" style="${heroUrl ? '' : 'display:none;'}">
                     <img id="cp-hero_${m.id}" src="${heroUrl}" alt="" onerror="this.parentElement.style.display='none'">
                 </div>
